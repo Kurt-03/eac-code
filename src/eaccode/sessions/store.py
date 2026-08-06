@@ -73,7 +73,9 @@ class SessionStore:
         return sid
 
     @staticmethod
-    def _index_messages(conn: sqlite3.Connection, sid: str, title: str, messages: list[Message]) -> None:
+    def _index_messages(
+        conn: sqlite3.Connection, sid: str, title: str, messages: list[Message]
+    ) -> None:
         """Refresh the FTS index for one session (delete + reinsert)."""
         conn.execute("DELETE FROM messages_fts WHERE session_id = ?", (sid,))
         body = "\n".join(m.text for m in messages if m.text)
