@@ -1,5 +1,4 @@
 """Tests for the agent factory (system prompt wiring: context+memory+skills)."""
-from pathlib import Path
 
 from eaccode.agent.factory import build_system_context
 

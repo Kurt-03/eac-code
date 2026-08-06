@@ -1,5 +1,4 @@
 """Tests for slash-command handling (Task 7.2)."""
-import pytest
 
 from eaccode.ui.commands import handle_command
 
@@ -12,8 +11,8 @@ class FakeApp:
 
     @property
     def policy(self):
-        class P:
-            mode = "default"
+        class _Policy:
+            _mode = "default"
 
             def __init__(self, parent):
                 self._parent = parent
@@ -26,7 +25,7 @@ class FakeApp:
             def mode(self, value):
                 self._parent.policy_mode = value
 
-        return P(self)
+        return _Policy(self)
 
 
 def test_help_command():

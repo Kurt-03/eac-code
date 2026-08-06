@@ -51,7 +51,7 @@ class MemoryStore:
         path = self._file(project_hash)
         if not path.exists():
             return
-        kept = [l for l in path.read_text(encoding="utf-8").splitlines() if text not in l]
+        kept = [ln for ln in path.read_text(encoding="utf-8").splitlines() if text not in ln]
         path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
 
     def _trim(self, path: Path) -> None:

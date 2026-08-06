@@ -11,8 +11,8 @@ from pathlib import Path
 from eaccode.agent.context import build_system_prompt
 from eaccode.agent.loop import AgentConfig, AgentLoop
 from eaccode.config.paths import EaccodePaths
-from eaccode.config.settings import PermissionMode, Settings
 from eaccode.config.providers import load_providers
+from eaccode.config.settings import PermissionMode, Settings
 from eaccode.llm.client import LLMClient
 from eaccode.memory.project import discover_project_context
 from eaccode.memory.skills import discover_skills, skills_to_system_prompt_section

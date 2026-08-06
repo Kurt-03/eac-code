@@ -18,7 +18,7 @@ async def test_web_fetch_extracts_text(monkeypatch, tmp_path):
     orig_client = httpx.Client
     monkeypatch.setattr(
         "eaccode.tools.builtin.web_fetch.httpx.Client",
-        lambda *a, **k: orig_client(transport=httpx.MockTransport(handler), *a, **k),
+        lambda *a, **k: orig_client(*a, transport=httpx.MockTransport(handler), **k),
     )
     tool = WebFetchTool()
     ctx = ToolContext(workdir=tmp_path)
@@ -37,7 +37,7 @@ async def test_web_fetch_http_error(monkeypatch, tmp_path):
     orig_client = httpx.Client
     monkeypatch.setattr(
         "eaccode.tools.builtin.web_fetch.httpx.Client",
-        lambda *a, **k: orig_client(transport=httpx.MockTransport(handler), *a, **k),
+        lambda *a, **k: orig_client(*a, transport=httpx.MockTransport(handler), **k),
     )
     tool = WebFetchTool()
     ctx = ToolContext(workdir=tmp_path)

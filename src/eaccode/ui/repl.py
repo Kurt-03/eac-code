@@ -5,7 +5,6 @@ ui.commands; agent built by agent.factory (project context + memory + skills).
 """
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 from rich.panel import Panel
@@ -14,7 +13,6 @@ from textual.containers import Vertical
 from textual.widgets import Input, RichLog
 
 from eaccode.agent.factory import build_agent
-from eaccode.config.paths import EaccodePaths
 from eaccode.memory.store import MemoryStore
 from eaccode.ui.commands import handle_command
 
@@ -80,7 +78,7 @@ class EaccodeApp(App):
         if not text:
             return
         event.input.value = ""
-        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}", border_style="blue"))
+        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}", border_style="blue"))  # noqa: RUF001 — prompt glyph
 
         if text.startswith("/"):
             result = handle_command(text, self)
