@@ -1,5 +1,4 @@
 """Tests for the streaming agent loop (Task 7.3)."""
-from pathlib import Path
 
 import pytest
 
