@@ -39,7 +39,7 @@ def save_mcp_configs(path: Path, configs: list[MCPServerConfig]) -> None:
                     encoding="utf-8")
 
 
-async def connect_mcp_tools(config_path: Path) -> tuple[list[Tool], MCPManager | None]:
+async def connect_mcp_tools(config_path: Path) -> tuple[list, MCPManager | None]:
     """Load mcp.yaml and connect. Returns (tools, manager) or ([], None)."""
     from eaccode.tools.mcp.adapter import create_mcp_tool
 

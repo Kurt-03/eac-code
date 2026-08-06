@@ -388,7 +388,10 @@ def mcp_list() -> None:
     paths = EaccodePaths()
     configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
     if not configs:
-        click.echo("No MCP servers configured. Add one with: eaccode mcp add <name> -- <command> [args...]")
+        click.echo(
+            "No MCP servers configured. Add one with: "
+            "eaccode mcp add <name> -- <command> [args...]"
+        )
         return
     for c in configs:
         click.echo(f"  {c.name:20s} {c.command} {' '.join(c.args)}")

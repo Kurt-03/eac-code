@@ -17,6 +17,10 @@ def _model_from_schema(name: str, schema: dict) -> type[BaseModel]:
             Field(default=None, description=prop.get("description", "")),
         )
     required = set(schema.get("required", []))
+    for prop_name in required:
+        if prop_name in fields:
+            field_info = fields[prop_name][1]
+            field_info.default = ...  # required → no default (must be provided)
     return create_model(name, **fields, __validators__={})  # type: ignore[call-arg]
 
 
