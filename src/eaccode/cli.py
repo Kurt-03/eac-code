@@ -291,7 +291,6 @@ def curator() -> None:
 @curator.command("run")
 def curator_run() -> None:
     """Scan skills + memory and write a maintenance report."""
-    import asyncio
 
     from eaccode.curator.curator import dedupe_memory, find_stale_skills
     from eaccode.memory.skills import discover_skills
