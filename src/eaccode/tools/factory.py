@@ -11,6 +11,8 @@ from eaccode.tools.builtin.write import WriteTool
 
 
 def _all_tools() -> list[Tool]:
+    from eaccode.memory.skill_tools import SkillCreateTool, SkillListTool, SkillPatchTool
+
     return [
         ReadTool(),
         WriteTool(),
@@ -18,6 +20,9 @@ def _all_tools() -> list[Tool]:
         BashTool(),
         GlobTool(),
         TodoWriteTool(),
+        SkillCreateTool(),
+        SkillPatchTool(),
+        SkillListTool(),
     ]
 
 
