@@ -80,3 +80,18 @@ async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
         return data.get("result", ""), data.get("cost_usd", 0.0)
     except Exception:
         return stdout.decode(), 0.0
+
+
+def make_worktree_runner(worktrees, runner):
+    """Wrap a runner so each job executes in its own isolated git worktree
+    (Task 11.1) — parallel reviews never touch the main tree. The worktree
+    is always cleaned up, even on failure."""
+
+    async def wrapped(job: Job, workdir: Path) -> tuple[str, float]:
+        wt = worktrees.create(job.name)
+        try:
+            return await runner(job, wt)
+        finally:
+            worktrees.cleanup(job.name)
+
+    return wrapped

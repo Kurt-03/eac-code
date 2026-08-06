@@ -396,11 +396,14 @@ def review_cmd(diff_ref: str, aspects: str | None, detach: bool) -> None:
         return
 
     # Blocking mode: process the queue (including jobs from other terminals)
-    # until all jobs we enqueued are finished
-    from eaccode.orchestrator.pool import WorkerPool, agent_runner
+    # until all jobs we enqueued are finished. Each job runs in its own
+    # isolated git worktree (Task 11.1).
+    from eaccode.orchestrator.pool import WorkerPool, agent_runner, make_worktree_runner
+    from eaccode.orchestrator.worktree import WorktreeManager
 
     async def _wait() -> None:
-        pool = WorkerPool(queue, agent_runner)
+        runner = make_worktree_runner(WorktreeManager(Path.cwd()), agent_runner)
+        pool = WorkerPool(queue, runner)
         while True:
             await pool.run_until_idle(wait_for_new=False)
             remaining = [
