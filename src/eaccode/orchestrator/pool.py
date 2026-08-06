@@ -58,7 +58,6 @@ class WorkerPool:
 async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
     """Run one headless agent (`eaccode run --print`) for a queued job."""
     import json
-    import subprocess
 
     cmd = [
         "eaccode", "run", job.prompt,

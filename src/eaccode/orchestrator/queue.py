@@ -9,13 +9,13 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     DONE = "done"

@@ -1,5 +1,4 @@
 """Tests for the queue CLI commands (Task 11.4)."""
-import json
 
 from click.testing import CliRunner
 
@@ -25,7 +24,7 @@ def _seed_job(tmp_path):
 
 def test_queue_status_shows_jobs(tmp_path, monkeypatch):
     runner = _runner_with_paths(tmp_path, monkeypatch)
-    jid = _seed_job(tmp_path)
+    _seed_job(tmp_path)
     result = runner.invoke(main, ["queue", "status"])
     assert result.exit_code == 0, result.output
     assert "review-bugs" in result.output
@@ -37,6 +36,7 @@ def test_queue_show_after_complete(tmp_path, monkeypatch):
     jid = _seed_job(tmp_path)
 
     import asyncio
+
     from eaccode.config.paths import EaccodePaths
 
     q = JobQueue(EaccodePaths().data_dir / "queue.db")

@@ -24,7 +24,7 @@ async def test_pool_cap_and_scaling(tmp_path):
     t0 = time.monotonic()
     await pool.run_until_idle()
     elapsed = time.monotonic() - t0
-    assert elapsed < 4.0  # 2 Wellen à 6 × 1s, nicht 12s
+    assert elapsed < 4.0  # 2 waves of 6 x 1s, not 12s
     jobs = await queue.list_jobs(limit=20)
     assert all(j.status == JobStatus.DONE for j in jobs)
 
