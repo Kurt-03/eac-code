@@ -1,0 +1,1 @@
+"""Konfiguration: Pfade, Settings, Provider."""
