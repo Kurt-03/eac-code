@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -13,7 +14,7 @@ class Skill:
     description: str
     content: str
     source: Path
-    last_used: object | None = field(default=None)  # datetime, gesetzt vom Curator
+    last_used: datetime | None = field(default=None)  # file mtime = last touched
 
 
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -45,6 +46,7 @@ def discover_skills(paths: list[Path]) -> list[Skill]:
                     description=meta.get("description", ""),
                     content=body,
                     source=f,
+                    last_used=datetime.fromtimestamp(f.stat().st_mtime),
                 )
             )
     return skills
