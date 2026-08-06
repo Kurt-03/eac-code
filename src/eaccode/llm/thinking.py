@@ -1,13 +1,13 @@
-"""Provider-spezifisches Thinking/Reasoning (Task 2.4).
+"""Provider-specific thinking/reasoning (Task 2.4).
 
-`effort: low|medium|high` wird pro Provider+Modell in den richtigen
-API-Parameter übersetzt. Reasoning funktioniert bei jedem Anbieter anders:
+`effort: low|medium|high` is translated per provider+model into the right
+API parameter. Reasoning works differently for every provider:
 
-- Anthropic: thinking.budget_tokens (nur Sonnet/Opus — Haiku nicht)
-- OpenAI o-Serie: reasoning_effort (GPT-4o: gar keiner)
+- Anthropic: thinking.budget_tokens (Sonnet/Opus only — not Haiku)
+- OpenAI o-series: reasoning_effort (GPT-4o: none at all)
 - Gemini: thinkingConfig.thinkingBudget
-- DeepSeek/Qwen/R1/Ollama: KEIN Parameter — reasoning_content kommt im Stream
-- Unbekannte Modelle: safe no-op, nie crashen
+- DeepSeek/Qwen/R1/Ollama: NO parameter — reasoning_content arrives in the stream
+- Unknown models: safe no-op, never crash
 """
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ class EffortLevel(str, Enum):
 
 @dataclass(frozen=True)
 class ThinkingProfile:
-    """Wie ein Provider-Modell Reasoning akzeptiert."""
+    """How a provider model accepts reasoning."""
 
     kind: str  # "budget" | "effort" | "stream" | "none"
-    budgets: dict[EffortLevel, int] | None = None  # für kind="budget"
+    budgets: dict[EffortLevel, int] | None = None  # for kind="budget"
     budget_key: str | None = None  # "budget_tokens" | "thinkingBudget"
 
 
@@ -49,13 +49,13 @@ PROFILES: dict[str, ThinkingProfile] = {
         "thinkingBudget",
     ),
     "xai/grok": ThinkingProfile("effort"),
-    "deepseek": ThinkingProfile("stream"),  # reasoning_content im Stream
+    "deepseek": ThinkingProfile("stream"),  # reasoning_content in the stream
     "ollama": ThinkingProfile("stream"),
 }
 
 
 class ThinkingMapper:
-    """Übersetzt EffortLevel → provider-spezifische Request-Parameter."""
+    """Translates EffortLevel → provider-specific request parameters."""
 
     def apply(self, model: str, effort: EffortLevel) -> dict:
         profile = self._profile_for(model)
@@ -67,7 +67,7 @@ class ThinkingMapper:
                 return {"thinking": {"type": "enabled", "budget_tokens": budget}}
         if profile.kind == "effort":
             return {"reasoning_effort": effort.value}
-        return {}  # "stream" (automatisch, nur Rendering) oder "none"
+        return {}  # "stream" (automatic, rendering only) or "none"
 
     def _profile_for(self, model: str) -> ThinkingProfile:
         for key, profile in PROFILES.items():
@@ -79,5 +79,5 @@ class ThinkingMapper:
         return self._profile_for(model).kind != "none"
 
     def is_stream_reasoning(self, model: str) -> bool:
-        """Modelle, die reasoning_content im Stream liefern (DeepSeek/Qwen/R1)."""
+        """Models that deliver reasoning_content in the stream (DeepSeek/Qwen/R1)."""
         return self._profile_for(model).kind == "stream"

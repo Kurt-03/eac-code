@@ -1,4 +1,4 @@
-"""Tests für XDG-Pfad-Auflösung (Task 1.1)."""
+"""Tests for XDG path resolution (Task 1.1)."""
 import os
 from pathlib import Path
 
@@ -39,7 +39,7 @@ def test_providers_and_settings_files(tmp_path, monkeypatch):
 
 
 def test_windows_paths_single_level(tmp_path, monkeypatch):
-    """Auf Windows: %LOCALAPPDATA%\\eaccode — ohne doppelten App-Namen."""
+    """On Windows: %LOCALAPPDATA%\\eaccode — without the doubled app name."""
     if os.name != "nt":
         import pytest
 

@@ -1,4 +1,4 @@
-"""Tests für Token-Counting (Task 2.3)."""
+"""Tests for token counting (Task 2.3)."""
 from eaccode.llm.models import Message, ToolCall
 from eaccode.llm.tokens import count_message_tokens, model_context_window
 

@@ -1,4 +1,4 @@
-"""Tests für das Settings-Modell (Task 1.3)."""
+"""Tests for the settings model (Task 1.3)."""
 import pytest
 
 from eaccode.config.settings import CuratorSettings, PermissionMode, Settings
@@ -40,7 +40,7 @@ def test_permission_mode_enum_values():
 
 def test_max_parallel_agents_validated():
     with pytest.raises(ValueError):
-        Settings(max_parallel_agents=0)  # muss >= 1 sein
+        Settings(max_parallel_agents=0)  # must be >= 1
 
 
 def test_curator_settings_roundtrip(tmp_path):

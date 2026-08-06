@@ -1,10 +1,10 @@
-"""CLI-Einstiegspunkt (Task 1.4).
+"""CLI entry point (Task 1.4).
 
-Befehlshierarchie (siehe Plan, Abschnitt "CLI Command Tree"):
-    eaccode                     → REPL (Phase 7, aktuell Hinweis)
-    eaccode paths               → XDG-Pfade anzeigen
+Command hierarchy (see plan, section "CLI Command Tree"):
+    eaccode                     → REPL (Phase 7, currently a hint)
+    eaccode paths               → show XDG paths
     eaccode providers add/list/remove/set-default
-    eaccode config show/set     → Settings anzeigen/ändern
+    eaccode config show/set     → show/change settings
 """
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ from eaccode.config.settings import Settings
 @click.version_option(version="0.1.0", prog_name="eaccode")
 @click.pass_context
 def main(ctx: click.Context) -> None:
-    """eaccode — autonomer Coding-Agent (BYOK)."""
+    """eaccode — autonomous coding agent (BYOK)."""
     if ctx.invoked_subcommand is None:
-        click.echo("eaccode — REPL kommt in Phase 7. Verfügbare Befehle: eaccode --help")
+        click.echo("eaccode — REPL arrives in Phase 7. Available commands: eaccode --help")
 
 
 @main.command()
 def paths() -> None:
-    """Zeige aufgelöste Konfigurations-/Datenpfade."""
+    """Show resolved config/data paths."""
     p = EaccodePaths()
     click.echo(f"config:    {p.config_dir}")
     click.echo(f"data:      {p.data_dir}")
@@ -40,37 +40,37 @@ def paths() -> None:
 
 @main.group()
 def providers() -> None:
-    """BYOK-Provider verwalten."""
+    """Manage BYOK providers."""
 
 
 @providers.command("add")
-@click.option("--provider", required=True, help="Provider-Name (minimax, anthropic, opencode-go, ...)")
-@click.option("--model", required=True, help="Standard-Modell dieses Providers")
-@click.option("--api-key", prompt=True, hide_input=True, help="API-Key (wird versteckt abgefragt)")
-@click.option("--base-url", default=None, help="Custom API-Base-URL (OpenAI-kompatible Endpoints)")
+@click.option("--provider", required=True, help="Provider name (minimax, anthropic, opencode-go, ...)")
+@click.option("--model", required=True, help="Default model for this provider")
+@click.option("--api-key", prompt=True, hide_input=True, help="API key (prompted hidden)")
+@click.option("--base-url", default=None, help="Custom API base URL (OpenAI-compatible endpoints)")
 def providers_add(provider: str, model: str, api_key: str, base_url: str | None) -> None:
-    """Provider + API-Key hinzufügen (BYOK)."""
+    """Add a provider + API key (BYOK)."""
     paths = EaccodePaths()
     existing = load_providers(paths.providers_file)
     for p in existing:
         if p.name == provider:
-            click.echo(f"✗ Provider '{provider}' existiert bereits — erst entfernen oder direkt in {paths.providers_file} bearbeiten.")
+            click.echo(f"✗ Provider '{provider}' already exists — remove it first or edit {paths.providers_file} directly.")
             raise SystemExit(1)
     existing.append(
         ProviderConfig(name=provider, api_key=api_key, model=model, base_url=base_url)  # type: ignore[arg-type]
     )
     save_providers(existing, paths.providers_file)
     paths.providers_file.chmod(0o600)
-    click.echo(f"✓ {provider} → {model} gespeichert ({paths.providers_file})")
+    click.echo(f"✓ {provider} → {model} saved ({paths.providers_file})")
 
 
 @providers.command("list")
 def providers_list() -> None:
-    """Konfigurierte Provider anzeigen (Keys maskiert)."""
+    """List configured providers (keys masked)."""
     paths = EaccodePaths()
     providers_list = load_providers(paths.providers_file)
     if not providers_list:
-        click.echo("Keine Provider konfiguriert. Hinzufügen mit: eaccode providers add")
+        click.echo("No providers configured. Add one with: eaccode providers add")
         return
     for p in providers_list:
         key = p.api_key.get_secret_value()
@@ -82,41 +82,41 @@ def providers_list() -> None:
 @providers.command("remove")
 @click.argument("name")
 def providers_remove(name: str) -> None:
-    """Provider entfernen."""
+    """Remove a provider."""
     paths = EaccodePaths()
     existing = load_providers(paths.providers_file)
     remaining = [p for p in existing if p.name != name]
     if len(remaining) == len(existing):
-        click.echo(f"✗ Provider '{name}' nicht gefunden.")
+        click.echo(f"✗ Provider '{name}' not found.")
         raise SystemExit(1)
     save_providers(remaining, paths.providers_file)
-    click.echo(f"✓ {name} entfernt")
+    click.echo(f"✓ {name} removed")
 
 
 @providers.command("set-default")
 @click.argument("name")
 def providers_set_default(name: str) -> None:
-    """Standard-Provider für neue Sessions setzen."""
+    """Set the default provider for new sessions."""
     paths = EaccodePaths()
     if not any(p.name == name for p in load_providers(paths.providers_file)):
-        click.echo(f"✗ Provider '{name}' nicht konfiguriert.")
+        click.echo(f"✗ Provider '{name}' not configured.")
         raise SystemExit(1)
     settings = Settings.load(paths.settings_file)
     settings.default_provider = name
     settings.save(paths.settings_file)
-    click.echo(f"✓ Standard-Provider: {name}")
+    click.echo(f"✓ Default provider: {name}")
 
 
 # ------------------------------------------------------------------ config
 
 @main.group()
 def config() -> None:
-    """Settings anzeigen und ändern."""
+    """Show and change settings."""
 
 
 @config.command("show")
 def config_show() -> None:
-    """Aktuelle Settings anzeigen."""
+    """Show current settings."""
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
     for k, v in settings.model_dump(mode="json").items():
@@ -127,17 +127,17 @@ def config_show() -> None:
 @click.argument("key")
 @click.argument("value")
 def config_set(key: str, value: str) -> None:
-    """Setting setzen, z.B. `eaccode config set permission_mode acceptEdits`."""
+    """Set a setting, e.g. `eaccode config set permission_mode acceptEdits`."""
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
     if key not in Settings.model_fields:
-        click.echo(f"✗ Unbekanntes Setting: {key}. Bekannt: {', '.join(Settings.model_fields)}")
+        click.echo(f"✗ Unknown setting: {key}. Known: {', '.join(Settings.model_fields)}")
         raise SystemExit(1)
-    # Pydantic validiert selbst (Enum, int, bool, float, Constraints wie ge=1)
+    # Pydantic validates itself (enum, int, bool, float, constraints like ge=1)
     try:
         updated = Settings.model_validate({**settings.model_dump(), key: value})
     except Exception as e:
-        click.echo(f"✗ Ungültiger Wert für {key}: {value} ({e})")
+        click.echo(f"✗ Invalid value for {key}: {value} ({e})")
         raise SystemExit(1)
     updated.save(paths.settings_file)
     value_out = getattr(updated, key)

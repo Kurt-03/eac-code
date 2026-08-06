@@ -1,4 +1,4 @@
-"""Tool-Protocol und Registry (Task 3.1)."""
+"""Tool protocol and registry (Task 3.1)."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

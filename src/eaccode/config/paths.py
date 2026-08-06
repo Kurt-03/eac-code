@@ -1,4 +1,4 @@
-"""XDG-konforme Pfad-Auflösung für eaccode (Task 1.1)."""
+"""XDG-compliant path resolution for eaccode (Task 1.1)."""
 from __future__ import annotations
 
 import os
@@ -9,13 +9,13 @@ from platformdirs import PlatformDirs
 
 
 def _xdg_or_default(env_var: str, platform_dir: str) -> Path:
-    """XDG-Env-Var ehren, wenn gesetzt (auch auf Windows), sonst Plattform-Default."""
+    """Honor XDG env var when set (also on Windows), otherwise platform default."""
     override = os.environ.get(env_var)
     if override:
         return Path(override) / "eaccode"
     if os.name == "nt":
-        # platformdirs verdoppelt auf Windows den App-Namen (eaccode\\eaccode) —
-        # deshalb hier direkt: %LOCALAPPDATA%\\eaccode
+        # platformdirs doubles the app name on Windows (eaccode\\eaccode) —
+        # so build directly: %LOCALAPPDATA%\\eaccode
         local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
         return local / "eaccode"
     dirs = PlatformDirs(appname="eaccode", appauthor=None, ensure_exists=True)
@@ -24,10 +24,10 @@ def _xdg_or_default(env_var: str, platform_dir: str) -> Path:
 
 @dataclass(frozen=True)
 class EaccodePaths:
-    """Alle eaccode-Verzeichnisse und -Dateien an einem Ort.
+    """All eaccode directories and files in one place.
 
-    Resolviert über platformdirs (XDG auf Linux/macOS, %APPDATA% auf Windows),
-    Verzeichnisse werden beim Erzeugen angelegt.
+    Resolved via platformdirs (XDG on Linux/macOS, %APPDATA% on Windows);
+    directories are created on instantiation.
     """
 
     config_dir: Path

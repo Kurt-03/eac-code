@@ -1,7 +1,7 @@
-"""BYOK-Provider-Konfiguration (Task 1.2).
+"""BYOK provider configuration (Task 1.2).
 
-User bringt eigene API-Keys mit — gespeichert in providers.yaml mit
-SecretStr (kein Key landet im Klartext in Logs/Pydantic-Dumps).
+Users bring their own API keys — stored in providers.yaml with
+SecretStr (no key ever appears in plaintext in logs or Pydantic dumps).
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ ProviderName = Literal[
     "opencode-go",
 ]
 
-# Provider mit nativem LiteLLM-Profil (bekommen ihr eigenes Prefix)
+# Providers with a native LiteLLM profile (get their own prefix)
 NATIVE_LITELLM_PROVIDERS = {
     "anthropic",
     "openai",
@@ -46,7 +46,7 @@ class ProviderConfig(BaseModel):
     extra: dict[str, str] = Field(default_factory=dict)
 
     def to_env(self) -> dict[str, str]:
-        """Provider-Konfiguration → Umgebungsvariablen für LiteLLM."""
+        """Provider config → environment variables for LiteLLM."""
         prefix = self.name.upper().replace("-", "_")
         env = {f"{prefix}_API_KEY": self.api_key.get_secret_value()}
         if self.base_url:
@@ -55,10 +55,10 @@ class ProviderConfig(BaseModel):
         return env
 
     def litellm_model(self, model: str) -> str:
-        """Modellname → LiteLLM-ID.
+        """Model name → LiteLLM ID.
 
-        Native Profile (minimax, anthropic, ...) bekommen ihr eigenes Prefix,
-        custom OpenAI-kompatible Endpoints (opencode-go, ...) das `openai/`-Prefix.
+        Native profiles (minimax, anthropic, ...) get their own prefix;
+        custom OpenAI-compatible endpoints (opencode-go, ...) get the `openai/` prefix.
         """
         if model.startswith(("openai/", "minimax/", "anthropic/", "google/", "deepseek/")):
             return model  # bereits prefixed

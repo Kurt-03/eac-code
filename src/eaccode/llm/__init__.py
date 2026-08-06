@@ -1,1 +1,1 @@
-"""LLM-Schicht: Modelle, Client, Tokens, Thinking, Aliase."""
+"""LLM layer: models, client, tokens, thinking, aliases."""

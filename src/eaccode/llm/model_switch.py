@@ -1,7 +1,7 @@
-"""Modell-Aliase + Fallback-Kette (Task 2.5, Hermes-Muster).
+"""Model aliases + fallback chain (Task 2.5, Hermes pattern).
 
-User-Aliase schlagen Built-ins; Fallback-Kette ersetzt Provider
-bei Rate-Limits/Timeouts (wie `hermes fallback add`).
+User aliases shadow built-ins; the fallback chain replaces providers
+on rate limits/timeouts (like `hermes fallback add`).
 """
 from __future__ import annotations
 
@@ -28,11 +28,11 @@ class ResolvedModel:
     def litellm_id(self) -> str:
         if self.provider in NATIVE_LITELLM_PROVIDERS:
             return f"{self.provider}/{self.model}"
-        return f"openai/{self.model}"  # custom Endpoints
+        return f"openai/{self.model}"  # custom endpoints
 
 
 class ModelResolver:
-    """User-Aliase (Settings.model_aliases) schlagen Built-ins."""
+    """User aliases (Settings.model_aliases) shadow built-ins."""
 
     BUILTINS: dict[str, ResolvedModel] = {
         "sonnet": ResolvedModel("anthropic", "claude-sonnet-4-6"),
@@ -49,19 +49,19 @@ class ModelResolver:
         self.aliases = aliases or {}
 
     def resolve(self, name: str) -> ResolvedModel:
-        if name in self.aliases:  # 1. User-Alias zuerst
+        if name in self.aliases:  # 1. User alias first
             a = self.aliases[name]
             return ResolvedModel(a.provider, a.model, a.base_url)
-        if name in self.BUILTINS:  # 2. Built-in-Alias
+        if name in self.BUILTINS:  # 2. Built-in alias
             return self.BUILTINS[name]
-        if "/" in name:  # 3. Vollqualifiziert "provider/model"
+        if "/" in name:  # 3. Fully qualified "provider/model"
             provider, model = name.split("/", 1)
             return ResolvedModel(provider, model)
         raise ValueError(f"Unknown model alias: {name}")
 
 
 class FallbackChain:
-    """Ersatz-Provider in Reihenfolge — wie `hermes fallback add`."""
+    """Replacement providers in order — like `hermes fallback add`."""
 
     def __init__(self, chain: list[tuple[str, str]] | None = None) -> None:
         self.chain = chain or []

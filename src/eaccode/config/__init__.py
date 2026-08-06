@@ -1,1 +1,1 @@
-"""Konfiguration: Pfade, Settings, Provider."""
+"""Configuration: paths, settings, providers."""

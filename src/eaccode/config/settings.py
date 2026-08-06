@@ -1,7 +1,7 @@
-"""Globale Settings (Task 1.3).
+"""Global settings (Task 1.3).
 
-Alle persistenten Einstellungen in einer Pydantic-Klasse —
-geladen/gespeichert als eaccode.yaml (XDG-Config-Verzeichnis).
+All persistent settings in one Pydantic class —
+loaded/saved as eaccode.yaml (XDG config directory).
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class PermissionMode(str, Enum):
 
 
 class CuratorSettings(BaseModel):
-    """Selbst-Wartung: stale Skills, Memory-Dedupe (wie Hermes curator)."""
+    """Self-maintenance: stale skills, memory dedupe (like Hermes curator)."""
 
     enabled: bool = True
     interval_hours: int = 24
@@ -29,7 +29,7 @@ class CuratorSettings(BaseModel):
 
 class Settings(BaseModel):
     default_provider: str = "anthropic"
-    default_model: str | None = None  # fällt auf das Provider-Modell zurück
+    default_model: str | None = None  # falls back to the provider's model
     permission_mode: PermissionMode = PermissionMode.DEFAULT
     max_turns: int = Field(default=50, ge=1, le=200)
     max_budget_usd: float | None = None
@@ -39,9 +39,9 @@ class Settings(BaseModel):
     auto_compact: bool = True
     compact_threshold: float = Field(default=0.7, ge=0.1, le=0.95)
     show_reasoning: bool = True  # wie Hermes display.show_reasoning
-    max_parallel_agents: int = Field(default=6, ge=1, le=64)  # harter Cap für den Worker-Pool
+    max_parallel_agents: int = Field(default=6, ge=1, le=64)  # hard cap for the worker pool
     save_sessions: bool = True
-    ignore_rules: bool = False  # --ignore-rules: Projekt-Context + Memory überspringen
+    ignore_rules: bool = False  # --ignore-rules: skip project context + memory
     curator: CuratorSettings = CuratorSettings()
 
     @classmethod

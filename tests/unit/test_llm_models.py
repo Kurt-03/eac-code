@@ -1,4 +1,4 @@
-"""Tests für die vendor-neutralen Message-Modelle (Task 2.1)."""
+"""Tests for the vendor-neutral message models (Task 2.1)."""
 from eaccode.llm.models import Message, Role, TextContent, ToolCall
 
 
@@ -46,7 +46,7 @@ def test_tool_result_error_flag():
 
 
 def test_message_roundtrip_via_json():
-    """Sessions speichern Messages als JSON — Roundtrip muss stabil sein."""
+    """Sessions store messages as JSON — the roundtrip must be stable."""
     m = Message.assistant_with_tool_calls(
         [TextContent(text="working")],
         [ToolCall(id="x1", name="bash", arguments={"command": "ls"})],

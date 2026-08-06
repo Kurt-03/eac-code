@@ -1,7 +1,7 @@
-"""Vendor-neutrale Message-/ToolCall-Modelle (Task 2.1).
+"""Vendor-neutral message/tool-call models (Task 2.1).
 
-Ein einziges Format für alle Provider — LiteLLM übersetzt in die
-provider-spezifische Form (Anthropic/OpenAI-Konventionen).
+A single format for all providers — LiteLLM translates into the
+provider-specific shape (Anthropic/OpenAI conventions).
 """
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ class Message(BaseModel):
     content: list[ContentBlock] = Field(default_factory=list)
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
-    name: str | None = None  # für tool-Rollen
+    name: str | None = None  # for tool roles
     is_error: bool | None = None
 
     @classmethod
@@ -82,5 +82,5 @@ class Message(BaseModel):
 
     @property
     def text(self) -> str:
-        """Gesamter Text-Inhalt der Nachricht (für Anzeige/Suche)."""
+        """Full text content of the message (for display/search)."""
         return "".join(b.text for b in self.content if b.type == "text")

@@ -1,1 +1,1 @@
-"""Tool-System: Protocol, Registry, Schema, Executor."""
+"""Tool system: protocol, registry, schema, executor."""

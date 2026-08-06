@@ -1,4 +1,4 @@
-"""Tests für Modell-Aliase + Fallback-Kette (Task 2.5)."""
+"""Tests for model aliases + fallback chain (Task 2.5)."""
 import pytest
 
 from eaccode.llm.model_switch import AliasConfig, FallbackChain, ModelResolver
@@ -17,7 +17,7 @@ def test_user_alias_resolution():
 
 def test_alias_shadows_builtin():
     r = ModelResolver(aliases={"sonnet": AliasConfig(provider="minimax", model="MiniMax-M2")})
-    assert r.resolve("sonnet").provider == "minimax"  # User-Alias schlägt Built-in
+    assert r.resolve("sonnet").provider == "minimax"  # user alias shadows the built-in
 
 
 def test_full_model_string_passthrough():
@@ -29,7 +29,7 @@ def test_full_model_string_passthrough():
 
 def test_builtin_alias():
     r = ModelResolver(aliases={})
-    assert r.resolve("minimax").model == "MiniMax-M3"  # User-Hauptmodell
+    assert r.resolve("minimax").model == "MiniMax-M3"  # user's main model
 
 
 def test_unknown_alias_raises():
@@ -49,5 +49,5 @@ def test_litellm_id_native_and_custom():
 def test_fallback_chain():
     chain = FallbackChain([("minimax", "MiniMax-M2"), ("opencode-go", "deepseek-v4-flash")])
     assert chain.next_after(0) == ("opencode-go", "deepseek-v4-flash")
-    assert chain.next_after(1) is None  # Ende der Kette
-    assert FallbackChain().next_after(0) is None  # leere Kette
+    assert chain.next_after(1) is None  # end of chain
+    assert FallbackChain().next_after(0) is None  # empty chain

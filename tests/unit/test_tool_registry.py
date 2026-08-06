@@ -1,4 +1,4 @@
-"""Tests für Tool-Protocol + Registry (Task 3.1)."""
+"""Tests for tool protocol + registry (Task 3.1)."""
 from pathlib import Path
 
 import pytest
@@ -61,4 +61,4 @@ def test_unknown_tool_raises_keyerror():
 
 
 def test_tool_default_requires_permission():
-    assert EchoTool().requires_permission is True  # Default: gefährliche Tools fragen
+    assert EchoTool().requires_permission is True  # default: dangerous tools ask

@@ -1,4 +1,4 @@
-"""Tests für das CLI-Grundgerüst (Task 1.4)."""
+"""Tests for the CLI skeleton (Task 1.4)."""
 from click.testing import CliRunner
 
 from eaccode.cli import main
@@ -34,7 +34,7 @@ def test_providers_add_and_list(tmp_path, monkeypatch):
     assert listed.exit_code == 0
     assert "minimax" in listed.output
     assert "MiniMax-M2" in listed.output
-    assert "mk-test-123" not in listed.output  # Key nie anzeigen
+    assert "mk-test-123" not in listed.output  # never show the key
 
 
 def test_providers_add_prompts_for_key(tmp_path, monkeypatch):

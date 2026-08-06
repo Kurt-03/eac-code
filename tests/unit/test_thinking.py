@@ -1,4 +1,4 @@
-"""Tests für provider-spezifisches Thinking (Task 2.4)."""
+"""Tests for provider-specific thinking (Task 2.4)."""
 from eaccode.llm.thinking import EffortLevel, ThinkingMapper
 
 
@@ -17,7 +17,7 @@ def test_anthropic_medium_budget():
 def test_anthropic_haiku_no_thinking():
     m = ThinkingMapper()
     params = m.apply("anthropic/claude-haiku-4-5", EffortLevel.HIGH)
-    assert "thinking" not in params  # Haiku unterstützt kein extended thinking
+    assert "thinking" not in params  # Haiku does not support extended thinking
 
 
 def test_openai_reasoning_effort():
@@ -29,7 +29,7 @@ def test_openai_reasoning_effort():
 def test_openai_gpt4o_no_thinking():
     m = ThinkingMapper()
     params = m.apply("openai/gpt-4o", EffortLevel.HIGH)
-    assert params == {}  # kein Reasoning-Param existiert
+    assert params == {}  # no reasoning param exists
 
 
 def test_gemini_thinking_budget():
@@ -40,7 +40,7 @@ def test_gemini_thinking_budget():
 
 def test_unknown_model_safe_noop():
     m = ThinkingMapper()
-    assert m.apply("ollama/qwen3:32b", EffortLevel.HIGH) == {}  # nie crashen
+    assert m.apply("ollama/qwen3:32b", EffortLevel.HIGH) == {}  # never crash
 
 
 def test_supports_thinking_flags():
@@ -51,7 +51,7 @@ def test_supports_thinking_flags():
 
 
 def test_stream_reasoning_models():
-    """DeepSeek/Qwen liefern reasoning_content im Stream — kein Request-Param."""
+    """DeepSeek/Qwen deliver reasoning_content in the stream — no request param."""
     m = ThinkingMapper()
     assert m.is_stream_reasoning("deepseek/deepseek-chat") is True
     assert m.is_stream_reasoning("ollama/qwen3:32b") is True

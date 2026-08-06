@@ -1,7 +1,7 @@
-"""Echte Provider-Verifikation (Task 1.5 Step 4).
+"""Real provider verification (Task 1.5 Step 4).
 
-Läuft nur, wenn der jeweilige API-Key als Env-Var gesetzt ist
-(MINIMAX_API_KEY / OPENCODE_GO_API_KEY) — z.B. nach:
+Runs only when the respective API key is set as an env var
+(MINIMAX_API_KEY / OPENCODE_GO_API_KEY) — e.g. after:
     eaccode providers add --provider minimax --model MiniMax-M3
 """
 import os
@@ -15,7 +15,7 @@ from eaccode.llm.models import Message
 
 @pytest.mark.skipif(
     not os.getenv("MINIMAX_API_KEY"),
-    reason="braucht MINIMAX_API_KEY (eaccode providers add --provider minimax)",
+    reason="requires MINIMAX_API_KEY (eaccode providers add --provider minimax)",
 )
 def test_real_minimax_completion(tmp_path):
     client = LLMClient(
@@ -29,13 +29,13 @@ def test_real_minimax_completion(tmp_path):
             max_tokens=50,
         )
     )
-    assert resp.text.strip(), "Leere Antwort vom Provider"
+    assert resp.text.strip(), "Empty response from provider"
     assert "OK" in resp.text.upper()
 
 
 @pytest.mark.skipif(
     not os.getenv("OPENCODE_GO_API_KEY"),
-    reason="braucht OPENCODE_GO_API_KEY (eaccode providers add --provider opencode-go)",
+    reason="requires OPENCODE_GO_API_KEY (eaccode providers add --provider opencode-go)",
 )
 def test_real_opencode_go_completion(tmp_path):
     client = LLMClient(

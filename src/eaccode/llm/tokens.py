@@ -1,7 +1,7 @@
-"""Token-Schätzung und Kontext-Fenster (Task 2.3).
+"""Token estimation and context windows (Task 2.3).
 
-tiktoken (cl100k_base) als Näherung für alle Modelle — exakte Zahlen
-kommen aus den API-Usage-Feldern (resp.usage).
+tiktoken (cl100k_base) as an approximation for all models — exact numbers
+come from the API usage fields (resp.usage).
 """
 from __future__ import annotations
 
@@ -13,15 +13,15 @@ from eaccode.llm.models import Message
 
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
-# Grobe Schätzung pro Bild-Content-Block
+# Rough estimate per image content block
 _IMAGE_TOKENS = 1500
 
 
 def count_message_tokens(messages: list[Message], model: str = "claude-sonnet-4-6") -> int:
-    """Näherungsweiser Token-Verbrauch der Nachrichtenliste."""
+    """Approximate token usage of the message list."""
     total = 0
     for m in messages:
-        total += 4  # Overhead pro Nachricht (Rolle + Formatierung)
+        total += 4  # Per-message overhead (role + formatting)
         for block in m.content:
             if block.type == "text":
                 total += len(_ENCODING.encode(block.text))
@@ -35,7 +35,7 @@ def count_message_tokens(messages: list[Message], model: str = "claude-sonnet-4-
 
 
 def model_context_window(model: str) -> int:
-    """Bekannte Kontext-Fenster nach Modell-Familie."""
+    """Known context windows by model family."""
     if "claude" in model:
         return 200_000
     if "gpt-4o" in model or "gpt-4-turbo" in model or "o3" in model or "o4" in model:

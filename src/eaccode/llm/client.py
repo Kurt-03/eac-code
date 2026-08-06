@@ -1,7 +1,7 @@
-"""LiteLLM-Client (Task 2.2).
+"""LiteLLM client (Task 2.2).
 
-Einheitliche Schnittstelle: complete() (sync, mit Retry) und stream() (async).
-Provider-spezifische Details (Prefix, Keys, Base-URLs) kommen aus providers.yaml.
+Unified interface: complete() (sync, with retry) and stream() (async).
+Provider-specific details (prefix, keys, base URLs) come from providers.yaml.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from eaccode.llm.models import Message, ToolCall
 
 
 class ReasoningDelta:
-    """reasoning_content aus dem Stream (DeepSeek/Qwen/R1) — separat vom Antworttext."""
+    """reasoning_content from the stream (DeepSeek/Qwen/R1) — delivered separately from the answer text."""
 
     def __init__(self, text: str) -> None:
         self.text = text
@@ -83,15 +83,15 @@ class LLMClient:
             for k, v in p.to_env().items():
                 os.environ.setdefault(k, v)
         litellm.telemetry = False
-        litellm.drop_params = True  # unbekannte Params (z.B. thinking) still ignorieren
+        litellm.drop_params = True  # silently ignore unknown params (e.g. thinking)
 
     # ------------------------------------------------------------- Auflösung
 
     def _resolve_model(self, model: str | None) -> str:
-        """Modellname → LiteLLM-ID (Provider-Prefix beachten)."""
+        """Model name → LiteLLM ID (respecting the provider prefix)."""
         model = model or self.default_model
         if "/" in model:
-            return model  # bereits qualifiziert
+            return model  # already qualified
         if self.provider_name:
             provider = self.providers.get(self.provider_name)
             if provider:
@@ -189,7 +189,7 @@ class LLMClient:
             output_tokens=getattr(resp.usage, "completion_tokens", 0),
             cost_usd=getattr(resp.usage, "cost", 0.0) or 0.0,
         )
-        # finish_reason normalisieren: "tool_calls" (OpenAI) → "tool_use" (Anthropic-Konvention)
+        # normalize finish_reason: "tool_calls" (OpenAI) → "tool_use" (Anthropic convention)
         stop_reason = getattr(choice, "finish_reason", None) or "stop"
         if stop_reason == "tool_calls":
             stop_reason = "tool_use"
@@ -204,7 +204,7 @@ class LLMClient:
     # -------------------------------------------------------------- stream
 
     async def stream(self, req: CompletionRequest) -> AsyncIterator[str | ToolCall | ReasoningDelta]:
-        """Yieldt Text-Deltas, Reasoning-Deltas und am Ende die Tool-Calls."""
+        """Yields text deltas, reasoning deltas, and finally the tool calls."""
         kwargs = self._base_kwargs(req)
         if req.tools:
             kwargs["tools"] = req.tools
@@ -218,7 +218,7 @@ class LLMClient:
             if not choices:
                 continue
             delta = choices[0].delta
-            # reasoning_content (DeepSeek/Qwen/R1) — separat liefern
+            # reasoning_content (DeepSeek/Qwen/R1) — deliver separately
             reasoning = getattr(delta, "reasoning_content", None)
             if reasoning:
                 yield ReasoningDelta(reasoning)

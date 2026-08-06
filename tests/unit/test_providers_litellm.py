@@ -1,4 +1,4 @@
-"""Tests für das LiteLLM-Modell-Mapping (Task 1.5)."""
+"""Tests for the LiteLLM model mapping (Task 1.5)."""
 from eaccode.config.providers import ProviderConfig
 
 

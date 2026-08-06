@@ -9,15 +9,15 @@ from eaccode.llm.models import Message, ToolCall
 
 @pytest.fixture
 def mock_completion(monkeypatch):
-    """Ersetzt die im Client gebundene completion-Referenz durch ein Mock.
+    """Replaces the completion reference bound in the client with a mock.
 
-    Wichtig: `from litellm import completion` bindet die Funktion beim Import —
-    deshalb hier `eaccode.llm.client.completion` patchen, nicht litellm.completion.
+    Important: `from litellm import completion` binds the function at import time —
+    so patch `eaccode.llm.client.completion` here, not litellm.completion.
     """
     import litellm
 
     def fake_completion(model, messages, **kwargs):
-        assert model == "minimax/MiniMax-M2"  # Prefix-Auflösung muss stimmen
+        assert model == "minimax/MiniMax-M2"  # prefix resolution must be correct
         return litellm.ModelResponse.model_validate({
             "choices": [
                 {

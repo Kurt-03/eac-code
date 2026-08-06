@@ -1,4 +1,4 @@
-"""Tests für BYOK-Provider-Konfiguration (Task 1.2)."""
+"""Tests for BYOK provider configuration (Task 1.2)."""
 from eaccode.config.providers import ProviderConfig, load_providers, save_providers
 
 
