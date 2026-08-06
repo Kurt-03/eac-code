@@ -54,6 +54,18 @@ class ProviderConfig(BaseModel):
         env.update({f"EACCODE_{k.upper()}": v for k, v in self.extra.items()})
         return env
 
+    def litellm_model(self, model: str) -> str:
+        """Modellname → LiteLLM-ID.
+
+        Native Profile (minimax, anthropic, ...) bekommen ihr eigenes Prefix,
+        custom OpenAI-kompatible Endpoints (opencode-go, ...) das `openai/`-Prefix.
+        """
+        if model.startswith(("openai/", "minimax/", "anthropic/", "google/", "deepseek/")):
+            return model  # bereits prefixed
+        if self.name in NATIVE_LITELLM_PROVIDERS:
+            return f"{self.name}/{model}"
+        return f"openai/{model}"  # custom/openai-kompatibel
+
 
 def save_providers(providers: list[ProviderConfig], path: Path) -> None:
     data = [
