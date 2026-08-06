@@ -439,6 +439,137 @@ def mcp_remove(name: str) -> None:
     click.echo(f"✓ MCP server '{name}' removed")
 
 
+# ------------------------------------------------------------------- doctor
+
+@main.command("doctor")
+def doctor() -> None:
+    """Diagnose the installation: providers, settings, git, skills, MCP."""
+    paths = EaccodePaths()
+    problems = 0
+
+    def check(ok: bool, msg: str) -> None:
+        nonlocal problems
+        click.echo(f"  {'✓' if ok else '✗'} {msg}")
+        if not ok:
+            problems += 1
+
+    click.echo("eaccode doctor")
+    providers = load_providers(paths.providers_file)
+    check(bool(providers), f"providers configured ({len(providers)})")
+    for p in providers:
+        click.echo(f"      {p.name:14s} {p.model}")
+    settings = Settings.load(paths.settings_file)
+    check(settings.permission_mode.value in ("default", "acceptEdits", "plan", "bypassPermissions"),
+          f"settings loadable (mode={settings.permission_mode.value})")
+    check(paths.skills_dir.exists(), f"skills dir exists ({paths.skills_dir})")
+    try:
+        subprocess_run = __import__("subprocess").run(
+            ["git", "--version"], capture_output=True, timeout=10
+        )
+        check(subprocess_run.returncode == 0, "git available")
+    except Exception:
+        check(False, "git available")
+    from eaccode.tools.mcp.client import load_mcp_configs
+
+    mcp_configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
+    check(len(mcp_configs) >= 0, f"mcp.yaml ({len(mcp_configs)} server(s) configured)")
+
+    if problems:
+        click.echo(f"\n{problems} issue(s) found.")
+        raise SystemExit(1)
+    click.echo("\nAll checks passed.")
+
+
+# ------------------------------------------------------------------ models
+
+@main.group()
+def models_cmd() -> None:
+    """Show configured models and their capabilities."""
+
+
+@models_cmd.command("list")
+def models_list() -> None:
+    """List configured providers/models with thinking capabilities."""
+    from eaccode.llm.thinking import ThinkingMapper
+
+    paths = EaccodePaths()
+    mapper = ThinkingMapper()
+    providers_list = load_providers(paths.providers_file)
+    if not providers_list:
+        click.echo("No providers configured.")
+        return
+    for p in providers_list:
+        litellm_id = p.litellm_model(p.model)
+        thinking = mapper.supports_thinking(litellm_id)
+        ctx_win = ""
+        click.echo(
+            f"  {p.name:14s} {p.model:30s} thinking={'✓' if thinking else '✗'}  "
+            f"({litellm_id})"
+        )
+
+
+# ------------------------------------------------------------------ skills
+
+@main.group()
+def skills() -> None:
+    """Manage skills (markdown instructions the agent loads)."""
+
+
+@skills.command("list")
+def skills_list() -> None:
+    """List installed skills."""
+    from eaccode.memory.skills import discover_skills
+
+    paths = EaccodePaths()
+    installed = discover_skills([paths.skills_dir])
+    if not installed:
+        click.echo(f"No skills installed. Put .md files in {paths.skills_dir}")
+        return
+    for s in installed:
+        click.echo(f"  {s.name:25s} {s.description}")
+
+
+@skills.command("add")
+@click.argument("path")
+def skills_add(path: str) -> None:
+    """Import a skill markdown file into the skills directory."""
+    import shutil
+
+    from eaccode.memory.skills import _parse_frontmatter
+
+    paths = EaccodePaths()
+    src = Path(path)
+    if not src.exists():
+        click.echo(f"✗ File not found: {src}")
+        raise SystemExit(1)
+    meta, _ = _parse_frontmatter(src.read_text(encoding="utf-8"))
+    name = meta.get("name") or src.stem
+    paths.skills_dir.mkdir(parents=True, exist_ok=True)
+    dest = paths.skills_dir / f"{name}.md"
+    shutil.copy2(src, dest)
+    click.echo(f"✓ Skill '{name}' installed at {dest}")
+
+
+# --------------------------------------------------------------- config init
+
+@config.command("init")
+def config_init() -> None:
+    """Create .eaccode/ with an EACCODE.md template in the current project."""
+    project_dir = Path.cwd()
+    dot_dir = project_dir / ".eaccode"
+    dot_dir.mkdir(exist_ok=True)
+    ctx_file = project_dir / "EACCODE.md"
+    if not ctx_file.exists():
+        ctx_file.write_text(
+            "# EACCODE.md — project rules for eaccode\n\n"
+            "## Build\n- (add your build/test commands here)\n\n"
+            "## Conventions\n- (add style/code conventions here)\n",
+            encoding="utf-8",
+        )
+    click.echo(f"✓ Created {ctx_file}")
+    click.echo(f"✓ Created {dot_dir} (put project skills here)")
+
+
 # ------------------------------------------------------------------- queue
 
 @main.group()

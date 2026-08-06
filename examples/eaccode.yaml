@@ -1,0 +1,26 @@
+# Example eaccode settings — copy to ~/.config/eaccode/eaccode.yaml
+# (or set per-key with: eaccode config set <key> <value>)
+
+default_provider: minimax          # used when no --model is given
+default_model: null                # falls back to the provider's model
+permission_mode: default           # default | acceptEdits | plan | bypassPermissions
+max_turns: 50
+max_parallel_agents: 6             # hard cap for the review queue / worker pool
+effort: medium                     # low | medium | high (provider-specific thinking)
+stream: true
+show_reasoning: true               # display reasoning_content (DeepSeek/Qwen)
+auto_compact: true
+compact_threshold: 0.7
+
+curator:
+  enabled: true
+  interval_hours: 24
+  stale_after_days: 90
+
+# --- MCP servers (external tools) ---
+# Add via: eaccode mcp add <name> -- <command> [args...]
+# Example:
+# mcp_servers:
+#   - name: filesystem
+#     command: npx
+#     args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
