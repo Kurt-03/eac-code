@@ -501,7 +501,6 @@ def models_list() -> None:
     for p in providers_list:
         litellm_id = p.litellm_model(p.model)
         thinking = mapper.supports_thinking(litellm_id)
-        ctx_win = ""
         click.echo(
             f"  {p.name:14s} {p.model:30s} thinking={'✓' if thinking else '✗'}  "
             f"({litellm_id})"
