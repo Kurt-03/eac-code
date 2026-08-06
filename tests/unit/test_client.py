@@ -159,3 +159,38 @@ def test_native_provider_passes_key_only(tmp_path):
     assert kwargs["model"] == "minimax/MiniMax-M3"
     assert kwargs["api_key"] == "mk-secret"
     assert "api_base" not in kwargs  # native provider: no base URL needed
+
+
+def test_tools_converted_to_openai_format(tmp_path):
+    """MiniMax rejected our tools with 'invalid tool type' (2013): it expects
+    the OpenAI format (type: function). LiteLLM converts OpenAI → Anthropic
+    automatically, but not the other way around — so we always send OpenAI."""
+    from eaccode.config.providers import ProviderConfig, save_providers
+
+    save_providers(
+        [ProviderConfig(name="minimax", api_key="mk", model="MiniMax-M3")],
+        tmp_path / "p.yaml",
+    )
+    client = LLMClient(
+        default_model="MiniMax-M3",
+        providers_file=tmp_path / "p.yaml",
+        provider_name="minimax",
+    )
+    req = CompletionRequest(
+        messages=[Message.user("hi")],
+        tools=[
+            {
+                "name": "read",
+                "description": "Read a file",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                },
+            }
+        ],
+    )
+    kwargs = client._base_kwargs(req)
+    tools = kwargs["tools"]
+    assert tools[0]["type"] == "function"
+    assert tools[0]["function"]["name"] == "read"
+    assert tools[0]["function"]["parameters"]["properties"]["path"]["type"] == "string"

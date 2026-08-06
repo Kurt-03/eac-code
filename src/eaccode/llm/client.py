@@ -157,6 +157,8 @@ class LLMClient:
             "max_tokens": req.max_tokens,
             "stream": req.stream,
         }
+        if req.tools:
+            kwargs["tools"] = self._to_litellm_tools(req.tools)
         # Pass credentials explicitly: LiteLLM only knows OPENAI_API_KEY for
         # `openai/`-prefixed custom endpoints, so per-request api_key/api_base
         # is required for BYOK providers like opencode-go (Task 1.5 finding).
@@ -167,6 +169,26 @@ class LLMClient:
                 kwargs["api_base"] = provider.base_url
         return kwargs
 
+    @staticmethod
+    def _to_litellm_tools(schemas: list[dict]) -> list[dict]:
+        """Convert our Anthropic-style tool schemas to the OpenAI format.
+
+        LiteLLM converts OpenAI → Anthropic automatically, but NOT the other
+        way around — MiniMax rejected Anthropic-style tools with
+        'invalid tool type' (2013) (live finding).
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object"}),
+                },
+            }
+            for t in schemas
+        ]
+
     # ------------------------------------------------------------- complete
 
     @retry(
@@ -176,8 +198,6 @@ class LLMClient:
     )
     def complete(self, req: CompletionRequest) -> CompletionResponse:
         kwargs = self._base_kwargs(req)
-        if req.tools:
-            kwargs["tools"] = req.tools
         if req.temperature is not None:
             kwargs["temperature"] = req.temperature
         resp = completion(**kwargs)
@@ -215,8 +235,6 @@ class LLMClient:
     async def stream(self, req: CompletionRequest) -> AsyncIterator[str | ToolCall | ReasoningDelta]:
         """Yields text deltas, reasoning deltas, and finally the tool calls."""
         kwargs = self._base_kwargs(req)
-        if req.tools:
-            kwargs["tools"] = req.tools
         if req.temperature is not None:
             kwargs["temperature"] = req.temperature
 
