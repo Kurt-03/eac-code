@@ -17,6 +17,9 @@ htmlcov/
 *.db-wal
 *.db-shm
 
+# Hermes workspace artifacts
+.hermes/
+
 # OS
 .DS_Store
 Thumbs.db
