@@ -42,7 +42,7 @@ class ModelResolver:
         "o3": ResolvedModel("openai", "o3"),
         "gemini": ResolvedModel("google", "gemini-2.5-pro"),
         "deepseek": ResolvedModel("deepseek", "deepseek-chat"),
-        "minimax": ResolvedModel("minimax", "MiniMax-M2"),
+        "minimax": ResolvedModel("minimax", "MiniMax-M3"),
     }
 
     def __init__(self, aliases: dict[str, AliasConfig] | None = None) -> None:

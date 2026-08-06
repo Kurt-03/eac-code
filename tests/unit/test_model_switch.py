@@ -29,7 +29,7 @@ def test_full_model_string_passthrough():
 
 def test_builtin_alias():
     r = ModelResolver(aliases={})
-    assert r.resolve("minimax").model == "MiniMax-M2"
+    assert r.resolve("minimax").model == "MiniMax-M3"  # User-Hauptmodell
 
 
 def test_unknown_alias_raises():
@@ -39,7 +39,7 @@ def test_unknown_alias_raises():
 
 
 def test_litellm_id_native_and_custom():
-    assert ModelResolver().resolve("minimax").litellm_id == "minimax/MiniMax-M2"
+    assert ModelResolver().resolve("minimax").litellm_id == "minimax/MiniMax-M3"
     r = ModelResolver(aliases={
         "oc": AliasConfig(provider="opencode-go", model="deepseek-v4-flash"),
     })
