@@ -16,6 +16,7 @@ from litellm import completion
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from eaccode.config.providers import load_providers
+from eaccode.llm.model_switch import FallbackChain
 from eaccode.llm.models import Message, ToolCall
 
 
@@ -75,10 +76,12 @@ class LLMClient:
         providers_file: Path,
         provider_name: str | None = None,
         effort: str = "medium",
+        fallback_chain: FallbackChain | None = None,
     ) -> None:
         self.default_model = default_model
         self.provider_name = provider_name
         self.effort = effort
+        self.fallback_chain = fallback_chain or FallbackChain()
         self.providers = {p.name: p for p in load_providers(providers_file)}
         for p in self.providers.values():
             for k, v in p.to_env().items():
@@ -88,16 +91,19 @@ class LLMClient:
 
     # ------------------------------------------------------------- Auflösung
 
-    def _resolve_model(self, model: str | None) -> str:
+    def _resolve_model(
+        self, model: str | None, provider_name: str | None = None
+    ) -> str:
         """Model name → LiteLLM ID (respecting the provider prefix)."""
         model = model or self.default_model
+        provider_name = provider_name or self.provider_name
         if "/" in model:
             return model  # already qualified
-        if self.provider_name:
-            provider = self.providers.get(self.provider_name)
+        if provider_name:
+            provider = self.providers.get(provider_name)
             if provider:
                 return provider.litellm_model(model)
-            return f"{self.provider_name}/{model}"
+            return f"{provider_name}/{model}"
         return model
 
     # ------------------------------------------------------- Konvertierung
@@ -151,9 +157,16 @@ class LLMClient:
                 out.append({"role": m.role.value, "content": content})
         return out
 
-    def _base_kwargs(self, req: CompletionRequest) -> dict:
+    def _base_kwargs(
+        self,
+        req: CompletionRequest,
+        *,
+        provider_name: str | None = None,
+        model: str | None = None,
+    ) -> dict:
+        provider_name = provider_name or self.provider_name
         kwargs = {
-            "model": self._resolve_model(req.model),
+            "model": self._resolve_model(model or req.model, provider_name),
             "messages": self._to_litellm_messages(req.messages, req.system),
             "max_tokens": req.max_tokens,
             "stream": req.stream,
@@ -163,7 +176,7 @@ class LLMClient:
         # Pass credentials explicitly: LiteLLM only knows OPENAI_API_KEY for
         # `openai/`-prefixed custom endpoints, so per-request api_key/api_base
         # is required for BYOK providers like opencode-go (Task 1.5 finding).
-        provider = self.providers.get(self.provider_name) if self.provider_name else None
+        provider = self.providers.get(provider_name) if provider_name else None
         if provider:
             kwargs["api_key"] = provider.api_key.get_secret_value()
             if provider.base_url:
@@ -192,13 +205,35 @@ class LLMClient:
 
     # ------------------------------------------------------------- complete
 
+    def complete(self, req: CompletionRequest) -> CompletionResponse:
+        """Complete with retries, then walk the fallback chain (Task 2.5)."""
+        try:
+            return self._complete_with_retry(req)
+        except _RETRYABLE:
+            if not self.fallback_chain.chain:
+                raise
+            # try each fallback provider once (with its own retries)
+            for index in range(len(self.fallback_chain.chain)):
+                provider_name, model = self.fallback_chain.chain[index]
+                try:
+                    return self._complete_with_retry(req, provider_name, model)
+                except _RETRYABLE:
+                    continue
+            raise
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(min=1, max=10),
         retry=retry_if_exception_type(_RETRYABLE),
+        reraise=True,  # raise the original exception, not tenacity.RetryError
     )
-    def complete(self, req: CompletionRequest) -> CompletionResponse:
-        kwargs = self._base_kwargs(req)
+    def _complete_with_retry(
+        self,
+        req: CompletionRequest,
+        provider_name: str | None = None,
+        model: str | None = None,
+    ) -> CompletionResponse:
+        kwargs = self._base_kwargs(req, provider_name=provider_name, model=model)
         if req.temperature is not None:
             kwargs["temperature"] = req.temperature
         resp = completion(**kwargs)

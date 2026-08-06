@@ -195,3 +195,49 @@ def test_tools_converted_to_openai_format(tmp_path):
     assert tools[0]["type"] == "function"
     assert tools[0]["function"]["name"] == "read"
     assert tools[0]["function"]["parameters"]["properties"]["path"]["type"] == "string"
+
+
+def test_fallback_chain_used_on_retryable_failure(tmp_path, monkeypatch):
+    """After retries are exhausted, the client falls back to the next
+    provider in the chain (Hermes pattern, Task 2.5)."""
+    import litellm
+
+    from eaccode.config.providers import ProviderConfig, save_providers
+    from eaccode.llm.model_switch import FallbackChain
+
+    save_providers(
+        [
+            ProviderConfig(name="minimax", api_key="mk", model="MiniMax-M3"),
+            ProviderConfig(name="opencode-go", api_key="oc", model="deepseek-v4-flash",
+                           base_url="https://opencode.ai/zen/go/v1"),
+        ],
+        tmp_path / "p.yaml",
+    )
+    calls: list[str] = []
+
+    def fake_completion(model, messages, **kwargs):
+        calls.append(model)
+        if "minimax" in model:
+            raise litellm.RateLimitError(
+                model=model,
+                message="rate limited",
+                llm_provider="minimax",
+                response=litellm.ModelResponse(),
+            )
+        return litellm.ModelResponse.model_validate({
+            "choices": [{"message": {"role": "assistant", "content": "from fallback"},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            "model": model,
+        })
+
+    monkeypatch.setattr("eaccode.llm.client.completion", fake_completion)
+    client = LLMClient(
+        default_model="MiniMax-M3",
+        providers_file=tmp_path / "p.yaml",
+        provider_name="minimax",
+        fallback_chain=FallbackChain([("opencode-go", "deepseek-v4-flash")]),
+    )
+    resp = client.complete(CompletionRequest(messages=[Message.user("hi")]))
+    assert resp.text == "from fallback"
+    assert calls[-1] == "openai/deepseek-v4-flash"  # letzter Versuch lief auf dem Fallback
