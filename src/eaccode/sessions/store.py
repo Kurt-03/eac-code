@@ -42,6 +42,13 @@ class SessionStore:
                 )
                 """
             )
+            # FTS5 index for session search (Task 6.6)
+            conn.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts
+                USING fts5(session_id UNINDEXED, title, body)
+                """
+            )
 
     async def save(
         self,
@@ -62,7 +69,19 @@ class SessionStore:
                 "messages=excluded.messages, updated_at=excluded.updated_at",
                 (sid, title, msgs_json, meta_json, now, now),
             )
+            self._index_messages(conn, sid, title, messages)
         return sid
+
+    @staticmethod
+    def _index_messages(conn: sqlite3.Connection, sid: str, title: str, messages: list[Message]) -> None:
+        """Refresh the FTS index for one session (delete + reinsert)."""
+        conn.execute("DELETE FROM messages_fts WHERE session_id = ?", (sid,))
+        body = "\n".join(m.text for m in messages if m.text)
+        if body.strip():
+            conn.execute(
+                "INSERT INTO messages_fts (session_id, title, body) VALUES (?, ?, ?)",
+                (sid, title, body[: 500_000]),
+            )
 
     async def load(self, session_id: str) -> Session:
         with sqlite3.connect(self.db_path) as conn:
