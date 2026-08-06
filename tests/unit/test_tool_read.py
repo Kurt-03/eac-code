@@ -1,5 +1,4 @@
 """Tests for the built-in Read tool (Task 3.2)."""
-from pathlib import Path
 
 import pytest
 

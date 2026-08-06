@@ -1,5 +1,4 @@
 """Tests für den LiteLLM-Client (Task 2.2)."""
-from pathlib import Path
 
 import pytest
 
@@ -97,7 +96,9 @@ def test_token_usage_accumulates():
 
 
 def test_messages_convert_to_litellm_format(tmp_path):
-    client = LLMClient(default_model="m", providers_file=tmp_path / "p.yaml", provider_name="minimax")
+    client = LLMClient(
+        default_model="m", providers_file=tmp_path / "p.yaml", provider_name="minimax"
+    )
     msgs = [
         Message.system("sys"),
         Message.user("hello"),

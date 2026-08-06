@@ -1,4 +1,4 @@
-"""Policy engine (Task 4.1) — 4 modes × rules decide allow/ask/deny.
+"""Policy engine (Task 4.1) — 4 modes x rules decide allow/ask/deny.
 
 Priority: explicit DENY rules win over everything, then ALLOW rules,
 then the mode default.
@@ -68,7 +68,7 @@ class PolicyEngine:
 
         if self.mode == PermissionMode.BYPASS_PERMISSIONS:
             reason = (
-                f"Allowed by rule + bypass mode"
+                "Allowed by rule + bypass mode"
                 if allow_rule
                 else "Bypass permissions mode"
             )
@@ -78,7 +78,7 @@ class PolicyEngine:
             tool, _MODE_DEFAULTS[self.mode]["_default"]
         )
         if allow_rule and default_action in (Action.ASK, Action.DENY):
-            return Decision(Action.ALLOW, f"Allowed by rule", allow_rule)
+            return Decision(Action.ALLOW, "Allowed by rule", allow_rule)
         return Decision(
             default_action,
             f"Default action for {self.mode.value} mode on {tool}",

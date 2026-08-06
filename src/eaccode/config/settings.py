@@ -5,14 +5,14 @@ loaded/saved as eaccode.yaml (XDG config directory).
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
 
 
-class PermissionMode(str, Enum):
+class PermissionMode(StrEnum):
     DEFAULT = "default"
     ACCEPT_EDITS = "acceptEdits"
     PLAN = "plan"
@@ -45,7 +45,7 @@ class Settings(BaseModel):
     curator: CuratorSettings = CuratorSettings()
 
     @classmethod
-    def load(cls, path: Path) -> "Settings":
+    def load(cls, path: Path) -> Settings:
         if not path.exists():
             return cls()
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -53,6 +53,8 @@ class Settings(BaseModel):
 
     def save(self, path: Path) -> None:
         path.write_text(
-            yaml.safe_dump(self.model_dump(mode="json"), default_flow_style=False, allow_unicode=True),
+            yaml.safe_dump(
+                self.model_dump(mode="json"), default_flow_style=False, allow_unicode=True
+            ),
             encoding="utf-8",
         )

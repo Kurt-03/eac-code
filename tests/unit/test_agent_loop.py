@@ -1,9 +1,8 @@
 """Tests for the core agent loop (Task 5.1)."""
-from pathlib import Path
 
 import pytest
 
-from eaccode.agent.loop import AgentConfig, AgentLoop, MaxTurnsExceeded
+from eaccode.agent.loop import AgentConfig, AgentLoop, MaxTurnsExceededError
 from eaccode.config.settings import PermissionMode
 from eaccode.llm.client import CompletionRequest, CompletionResponse, TokenUsage
 from eaccode.llm.models import Message, ToolCall
@@ -77,7 +76,7 @@ async def test_agent_loop_respects_max_turns(tmp_path):
         client, reg, policy,
         AgentConfig(workdir=tmp_path, max_turns=3),
     )
-    with pytest.raises(MaxTurnsExceeded):
+    with pytest.raises(MaxTurnsExceededError):
         await agent.run([Message.user("hi")])
     assert client.calls == 3
 

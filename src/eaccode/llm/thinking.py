@@ -12,10 +12,10 @@ API parameter. Reasoning works differently for every provider:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class EffortLevel(str, Enum):
+class EffortLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"

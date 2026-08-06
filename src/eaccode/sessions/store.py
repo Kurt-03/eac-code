@@ -86,10 +86,7 @@ class SessionStore:
             return cur.rowcount > 0
 
     def _row_to_session(self, row: sqlite3.Row | tuple) -> Session:
-        if isinstance(row, sqlite3.Row):
-            get = lambda i: row[i]  # noqa: E731
-        else:
-            get = lambda i: row[i]  # noqa: E731
+        get = lambda i: row[i]  # noqa: E731
         return Session(
             id=get(0),
             title=get(1),

@@ -5,9 +5,9 @@ execute → results back to LLM → repeat until final answer or max_turns.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable
 
 from eaccode.llm.client import CompletionRequest, LLMClient, TokenUsage
 from eaccode.llm.models import Message, TextContent, ToolCall
@@ -18,7 +18,7 @@ from eaccode.tools.base import ToolContext, ToolRegistry
 from eaccode.tools.executor import ToolExecutor
 
 
-class MaxTurnsExceeded(Exception):
+class MaxTurnsExceededError(Exception):
     """Raised when the loop hits max_turns without a final answer."""
 
 
@@ -110,7 +110,7 @@ class AgentLoop:
                 if self.config.on_tool_result:
                     self.config.on_tool_result(tc, result)
 
-        raise MaxTurnsExceeded(
+        raise MaxTurnsExceededError(
             f"Reached max_turns={self.config.max_turns} without a final answer"
         )
 

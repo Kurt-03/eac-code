@@ -5,13 +5,13 @@ provider-specific shape (Anthropic/OpenAI conventions).
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
-class Role(str, Enum):
+class Role(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -46,21 +46,21 @@ class Message(BaseModel):
     is_error: bool | None = None
 
     @classmethod
-    def system(cls, text: str) -> "Message":
+    def system(cls, text: str) -> Message:
         return cls(role=Role.SYSTEM, content=[TextContent(text=text)])
 
     @classmethod
-    def user(cls, text: str, images: list[ImageContent] | None = None) -> "Message":
+    def user(cls, text: str, images: list[ImageContent] | None = None) -> Message:
         return cls(role=Role.USER, content=[TextContent(text=text), *(images or [])])
 
     @classmethod
-    def assistant(cls, text: str) -> "Message":
+    def assistant(cls, text: str) -> Message:
         return cls(role=Role.ASSISTANT, content=[TextContent(text=text)])
 
     @classmethod
     def assistant_with_tool_calls(
         cls, blocks: list[ContentBlock], tool_calls: list[ToolCall]
-    ) -> "Message":
+    ) -> Message:
         return cls(role=Role.ASSISTANT, content=blocks, tool_calls=tool_calls)
 
     @classmethod
@@ -71,7 +71,7 @@ class Message(BaseModel):
         *,
         is_error: bool = False,
         name: str | None = None,
-    ) -> "Message":
+    ) -> Message:
         return cls(
             role=Role.TOOL,
             content=[TextContent(text=content)],

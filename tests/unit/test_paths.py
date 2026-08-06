@@ -1,6 +1,5 @@
 """Tests for XDG path resolution (Task 1.1)."""
 import os
-from pathlib import Path
 
 from eaccode.config.paths import EaccodePaths
 

@@ -16,7 +16,10 @@ def test_default_settings():
 
 
 def test_settings_yaml_roundtrip(tmp_path):
-    s = Settings(max_turns=10, default_provider="minimax", permission_mode=PermissionMode.ACCEPT_EDITS)
+    s = Settings(
+        max_turns=10, default_provider="minimax",
+        permission_mode=PermissionMode.ACCEPT_EDITS,
+    )
     file = tmp_path / "eaccode.yaml"
     s.save(file)
     loaded = Settings.load(file)

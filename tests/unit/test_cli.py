@@ -2,7 +2,6 @@
 from click.testing import CliRunner
 
 from eaccode.cli import main
-from eaccode.config.settings import PermissionMode
 
 
 def _runner_with_isolated_paths(tmp_path, monkeypatch):

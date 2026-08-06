@@ -46,7 +46,8 @@ def providers() -> None:
 
 
 @providers.command("add")
-@click.option("--provider", required=True, help="Provider name (minimax, anthropic, opencode-go, ...)")
+@click.option("--provider", required=True,
+              help="Provider name (minimax, anthropic, opencode-go, ...)")
 @click.option("--model", required=True, help="Default model for this provider")
 @click.option("--api-key", prompt=True, hide_input=True, help="API key (prompted hidden)")
 @click.option("--base-url", default=None, help="Custom API base URL (OpenAI-compatible endpoints)")
@@ -56,7 +57,10 @@ def providers_add(provider: str, model: str, api_key: str, base_url: str | None)
     existing = load_providers(paths.providers_file)
     for p in existing:
         if p.name == provider:
-            click.echo(f"✗ Provider '{provider}' already exists — remove it first or edit {paths.providers_file} directly.")
+            click.echo(
+                f"✗ Provider '{provider}' already exists — remove it first "
+                f"or edit {paths.providers_file} directly."
+            )
             raise SystemExit(1)
     existing.append(
         ProviderConfig(name=provider, api_key=api_key, model=model, base_url=base_url)  # type: ignore[arg-type]
@@ -134,13 +138,13 @@ def config_set(key: str, value: str) -> None:
     settings = Settings.load(paths.settings_file)
     if key not in Settings.model_fields:
         click.echo(f"✗ Unknown setting: {key}. Known: {', '.join(Settings.model_fields)}")
-        raise SystemExit(1)
+        raise SystemExit(1) from None
     # Pydantic validates itself (enum, int, bool, float, constraints like ge=1)
     try:
         updated = Settings.model_validate({**settings.model_dump(), key: value})
     except Exception as e:
         click.echo(f"✗ Invalid value for {key}: {value} ({e})")
-        raise SystemExit(1)
+        raise SystemExit(1) from None
     updated.save(paths.settings_file)
     value_out = getattr(updated, key)
     click.echo(f"✓ {key} = {value_out.value if hasattr(value_out, 'value') else value_out}")
@@ -162,9 +166,8 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
     """Run one task headlessly (for CI, the queue, and the future GUI)."""
     import asyncio
     import json as jsonlib
-    import sys
 
-    from eaccode.agent.loop import AgentLoop, AgentConfig, MaxTurnsExceeded
+    from eaccode.agent.loop import AgentConfig, AgentLoop, MaxTurnsExceededError
     from eaccode.config.providers import load_providers
     from eaccode.llm.client import LLMClient
     from eaccode.llm.models import Message
@@ -223,9 +226,9 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
 
     try:
         result = asyncio.run(agent.run([Message.user(prompt)]))
-    except MaxTurnsExceeded as e:
+    except MaxTurnsExceededError as e:
         click.echo(f"Error: {e}", err=True)
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
     if output_format == "json":
         click.echo(jsonlib.dumps({

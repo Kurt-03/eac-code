@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from fnmatch import fnmatch
 
 
-class Action(str, Enum):
+class Action(StrEnum):
     ALLOW = "allow"
     ASK = "ask"
     DENY = "deny"

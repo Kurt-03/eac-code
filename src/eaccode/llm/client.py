@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncIterator
 
 import litellm
 from litellm import completion
@@ -20,7 +20,8 @@ from eaccode.llm.models import Message, ToolCall
 
 
 class ReasoningDelta:
-    """reasoning_content from the stream (DeepSeek/Qwen/R1) — delivered separately from the answer text."""
+    """reasoning_content from the stream (DeepSeek/Qwen/R1) —
+    delivered separately from the answer text."""
 
     def __init__(self, text: str) -> None:
         self.text = text
@@ -32,7 +33,7 @@ class TokenUsage:
     output_tokens: int = 0
     cost_usd: float = 0.0
 
-    def __iadd__(self, other: "TokenUsage") -> "TokenUsage":
+    def __iadd__(self, other: TokenUsage) -> TokenUsage:
         self.input_tokens += other.input_tokens
         self.output_tokens += other.output_tokens
         self.cost_usd += other.cost_usd
@@ -232,7 +233,9 @@ class LLMClient:
 
     # -------------------------------------------------------------- stream
 
-    async def stream(self, req: CompletionRequest) -> AsyncIterator[str | ToolCall | ReasoningDelta]:
+    async def stream(
+        self, req: CompletionRequest
+    ) -> AsyncIterator[str | ToolCall | ReasoningDelta]:
         """Yields text deltas, reasoning deltas, and finally the tool calls."""
         kwargs = self._base_kwargs(req)
         if req.temperature is not None:

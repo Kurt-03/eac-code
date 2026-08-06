@@ -11,7 +11,7 @@ from eaccode.tools.base import Tool, ToolContext, ToolResult
 class TodoItem(BaseModel):
     status: Literal["pending", "in_progress", "completed", "cancelled"] = "pending"
     content: str = Field(description="What needs to be done")
-    activeForm: str | None = Field(
+    activeForm: str | None = Field(  # noqa: N815 — LLM-facing API field (Claude Code convention)
         default=None, description="Active verb form, e.g. 'Fixing auth'"
     )
 

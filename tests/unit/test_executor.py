@@ -1,5 +1,4 @@
 """Tests for the ToolExecutor (Task 3.7)."""
-from pathlib import Path
 
 import pytest
 

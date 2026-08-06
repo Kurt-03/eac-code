@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -41,7 +40,7 @@ class BashTool(Tool):
             )
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 await proc.wait()  # reap the process, avoid zombie/unraisable warnings
                 return ToolResult(

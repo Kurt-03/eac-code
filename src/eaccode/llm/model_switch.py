@@ -6,6 +6,7 @@ on rate limits/timeouts (like `hermes fallback add`).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 from pydantic import BaseModel
 
@@ -34,7 +35,7 @@ class ResolvedModel:
 class ModelResolver:
     """User aliases (Settings.model_aliases) shadow built-ins."""
 
-    BUILTINS: dict[str, ResolvedModel] = {
+    BUILTINS: ClassVar[dict[str, ResolvedModel]] = {
         "sonnet": ResolvedModel("anthropic", "claude-sonnet-4-6"),
         "opus": ResolvedModel("anthropic", "claude-opus-4-6"),
         "haiku": ResolvedModel("anthropic", "claude-haiku-4-5"),

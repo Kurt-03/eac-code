@@ -4,7 +4,6 @@ Uses the real BYOK config (providers.yaml via EaccodePaths) — the full path
 from `eaccode providers add` to a live API call. Skips when the provider
 is not configured.
 """
-from pathlib import Path
 
 import pytest
 

@@ -1,9 +1,8 @@
 """Tests for the permission confirmation prompts (Task 4.2)."""
 import pytest
-from click.testing import CliRunner
 
 from eaccode.permissions.prompts import prompt_for_permission
-from eaccode.permissions.rules import Action, Rule
+from eaccode.permissions.rules import Rule
 
 
 @pytest.mark.parametrize("answer,expected", [("y", True), ("n", False)])
