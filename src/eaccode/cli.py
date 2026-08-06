@@ -8,11 +8,13 @@ Command hierarchy (see plan, section "CLI Command Tree"):
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.providers import ProviderConfig, load_providers, save_providers
-from eaccode.config.settings import Settings
+from eaccode.config.settings import PermissionMode, Settings
 
 
 @click.group(invoke_without_command=True)
@@ -142,6 +144,101 @@ def config_set(key: str, value: str) -> None:
     updated.save(paths.settings_file)
     value_out = getattr(updated, key)
     click.echo(f"✓ {key} = {value_out.value if hasattr(value_out, 'value') else value_out}")
+
+
+@main.command("run")
+@click.argument("prompt")
+@click.option("--print", "print_mode", is_flag=True, help="Headless: result to stdout, no TUI")
+@click.option("--output-format", default="text", type=click.Choice(["text", "json"]),
+              help="Output format (headless)")
+@click.option("--max-turns", default=None, type=int, help="Override max turns")
+@click.option("--allowed-tools", default=None, help="Comma-separated tool whitelist")
+@click.option("--mode", "mode_name", default=None,
+              type=click.Choice([m.value for m in PermissionMode]),
+              help="Permission mode override (default for headless runs: bypassPermissions)")
+@click.option("--model", default=None, help="Model alias or provider/model")
+def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | None,
+            allowed_tools: str | None, mode_name: str | None, model: str | None) -> None:
+    """Run one task headlessly (for CI, the queue, and the future GUI)."""
+    import asyncio
+    import json as jsonlib
+    import sys
+
+    from eaccode.agent.loop import AgentLoop, AgentConfig, MaxTurnsExceeded
+    from eaccode.config.providers import load_providers
+    from eaccode.llm.client import LLMClient
+    from eaccode.llm.models import Message
+    from eaccode.permissions.policy import PolicyEngine
+    from eaccode.permissions.rules import RuleSet
+    from eaccode.tools.factory import build_default_registry
+
+    paths = EaccodePaths()
+    settings = Settings.load(paths.settings_file)
+    providers = load_providers(paths.providers_file)
+    if not providers:
+        click.echo(
+            "No providers configured. Add one first:\n"
+            "  eaccode providers add --provider minimax --model MiniMax-M3"
+        )
+        raise SystemExit(1)
+
+    # Resolve the provider: --model override, else default provider
+    if model:
+        from eaccode.llm.model_switch import ModelResolver
+
+        resolved = ModelResolver().resolve(model)
+        provider_name, default_model = resolved.provider, resolved.model
+    else:
+        provider = next(
+            (p for p in providers if p.name == settings.default_provider), providers[0]
+        )
+        provider_name, default_model = provider.name, provider.model
+
+    client = LLMClient(
+        default_model=default_model,
+        providers_file=paths.providers_file,
+        provider_name=provider_name,
+        effort=settings.effort,
+    )
+    registry = build_default_registry(
+        allowed_tools.split(",") if allowed_tools else None
+    )
+    # Headless runs are non-interactive: permission prompts would hang or
+    # auto-deny. Default to bypassPermissions (like `claude -p` in CI);
+    # an explicit --mode override wins. The --allowed-tools whitelist
+    # remains the safety net.
+    mode = (
+        PermissionMode(mode_name)
+        if mode_name
+        else PermissionMode.BYPASS_PERMISSIONS
+    )
+    policy = PolicyEngine(mode=mode, rules=RuleSet())
+    agent = AgentLoop(
+        client, registry, policy,
+        AgentConfig(
+            workdir=Path.cwd(),
+            max_turns=max_turns or settings.max_turns,
+        ),
+    )
+
+    try:
+        result = asyncio.run(agent.run([Message.user(prompt)]))
+    except MaxTurnsExceeded as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+
+    if output_format == "json":
+        click.echo(jsonlib.dumps({
+            "result": result.final_text,
+            "turns": result.turns,
+            "cost_usd": round(result.cost_usd, 4),
+            "usage": {
+                "input_tokens": result.usage.input_tokens,
+                "output_tokens": result.usage.output_tokens,
+            },
+        }))
+    else:
+        click.echo(result.final_text)
 
 
 if __name__ == "__main__":
