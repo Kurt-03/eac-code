@@ -294,11 +294,13 @@ def curator_run() -> None:
 
     from eaccode.curator.curator import dedupe_memory, find_stale_skills
     from eaccode.memory.skills import discover_skills
-    from eaccode.memory.store import MemoryStore
 
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
-    report: list[str] = ["# Curator report", f"generated: {__import__('datetime').datetime.now().isoformat()}"]
+    report: list[str] = [
+        "# Curator report",
+        f"generated: {__import__('datetime').datetime.now().isoformat()}",
+    ]
 
     # 1. stale skills (proposal only — never delete automatically)
     skills = discover_skills([paths.skills_dir])
@@ -312,7 +314,6 @@ def curator_run() -> None:
         report.append("\n## Stale skills\nNone — all skills are fresh.")
 
     # 2. memory dedupe (automatic, safe)
-    store = MemoryStore(paths.memory_dir)
     deduped_total = 0
     for mem_file in paths.memory_dir.glob("*.jsonl"):
         import json as jsonlib
