@@ -68,6 +68,7 @@ def build_agent(
     settings: Settings | None = None,
     paths: EaccodePaths | None = None,
     client_cls: type[LLMClient] | None = None,
+    mcp_tools: list | None = None,
 ) -> tuple[AgentLoop, LLMClient, SystemContext]:
     """Build a fully wired agent (used by `eaccode run` and the REPL)."""
     paths = paths or EaccodePaths()
@@ -100,6 +101,8 @@ def build_agent(
         effort=settings.effort,
     )
     registry = build_default_registry(allowed_tools)
+    for tool in mcp_tools or []:
+        registry.register(tool)
     policy = PolicyEngine(mode=mode or settings.permission_mode, rules=RuleSet())
 
     memory = MemoryStore(paths.memory_dir)

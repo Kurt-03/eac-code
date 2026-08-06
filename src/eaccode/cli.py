@@ -199,6 +199,17 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
         if mode_name
         else PermissionMode.BYPASS_PERMISSIONS
     )
+    # Load MCP servers (optional; failures degrade to a warning)
+    mcp_tools: list = []
+    try:
+        import asyncio as _asyncio
+
+        from eaccode.tools.mcp.client import connect_mcp_tools
+
+        mcp_tools, _ = _asyncio.run(connect_mcp_tools(paths.config_dir / "mcp.yaml"))
+    except Exception as e:
+        click.echo(f"Warning: MCP servers failed to load: {e}", err=True)
+
     agent, _, _ = build_agent(
         Path.cwd(),
         mode=mode,
@@ -207,6 +218,7 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
         model=model,
         settings=settings,
         paths=paths,
+        mcp_tools=mcp_tools,
     )
 
     try:
@@ -359,6 +371,69 @@ def curator_report() -> None:
         click.echo("No report yet. Run `eaccode curator run` first.")
         return
     click.echo(report.read_text(encoding="utf-8"))
+
+
+# ---------------------------------------------------------------------- mcp
+
+@main.group()
+def mcp() -> None:
+    """Manage MCP servers (external tool servers)."""
+
+
+@mcp.command("list")
+def mcp_list() -> None:
+    """List configured MCP servers."""
+    from eaccode.tools.mcp.client import load_mcp_configs
+
+    paths = EaccodePaths()
+    configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
+    if not configs:
+        click.echo("No MCP servers configured. Add one with: eaccode mcp add <name> -- <command> [args...]")
+        return
+    for c in configs:
+        click.echo(f"  {c.name:20s} {c.command} {' '.join(c.args)}")
+
+
+@mcp.command("add")
+@click.argument("name")
+@click.argument("command_args", nargs=-1, required=True)
+def mcp_add(name: str, command_args: tuple[str, ...]) -> None:
+    """Add an MCP server: eaccode mcp add <name> -- <command> [args...]"""
+    from eaccode.tools.mcp.client import (
+        MCPServerConfig,
+        load_mcp_configs,
+        save_mcp_configs,
+    )
+
+    paths = EaccodePaths()
+    if "--" in command_args:
+        idx = command_args.index("--")
+        command = command_args[idx + 1]
+        args = list(command_args[idx + 2 :])
+    else:
+        command = command_args[0]
+        args = list(command_args[1:])
+    configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
+    configs = [c for c in configs if c.name != name]
+    configs.append(MCPServerConfig(name=name, command=command, args=args))
+    save_mcp_configs(paths.config_dir / "mcp.yaml", configs)
+    click.echo(f"✓ MCP server '{name}' added ({command} {' '.join(args)})")
+
+
+@mcp.command("remove")
+@click.argument("name")
+def mcp_remove(name: str) -> None:
+    """Remove an MCP server."""
+    from eaccode.tools.mcp.client import load_mcp_configs, save_mcp_configs
+
+    paths = EaccodePaths()
+    configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
+    remaining = [c for c in configs if c.name != name]
+    if len(remaining) == len(configs):
+        click.echo(f"✗ MCP server '{name}' not found.")
+        raise SystemExit(1)
+    save_mcp_configs(paths.config_dir / "mcp.yaml", remaining)
+    click.echo(f"✓ MCP server '{name}' removed")
 
 
 # ------------------------------------------------------------------- queue

@@ -59,7 +59,7 @@ class EaccodeApp(App):
             yield Static(id="stream")
             yield Input(placeholder="Ask eaccode anything... (/help for commands)", id="input")
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
         log.write(
             Panel.fit(
@@ -70,9 +70,18 @@ class EaccodeApp(App):
             )
         )
         try:
-            agent, _, sysctx = build_agent(self.workdir)
+            from eaccode.config.paths import EaccodePaths
+            from eaccode.tools.mcp.client import connect_mcp_tools
+
+            paths = EaccodePaths()
+            mcp_tools, _mcp_mgr = await connect_mcp_tools(
+                paths.config_dir / "mcp.yaml"
+            )
+            agent, _, sysctx = build_agent(self.workdir, mcp_tools=mcp_tools)
             self._agent = agent
             self.memory_facts = sysctx.memory_facts
+            if mcp_tools:
+                log.write(f"[dim]MCP: {len(mcp_tools)} external tool(s) loaded[/dim]")
             if sysctx.memory_facts:
                 log.write("[dim]Loaded memory:[/dim]")
                 for f in sysctx.memory_facts:
