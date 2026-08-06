@@ -113,3 +113,49 @@ def test_messages_convert_to_litellm_format(tmp_path):
     assert out[2]["tool_calls"][0]["function"]["name"] == "bash"
     assert out[3]["role"] == "tool"
     assert out[3]["tool_call_id"] == "t1"
+
+
+def test_custom_endpoint_passes_credentials_explicitly(tmp_path):
+    """Custom OpenAI-compatible endpoints need api_key/api_base per request —
+    LiteLLM only knows OPENAI_API_KEY otherwise (Task 1.5 finding)."""
+    from eaccode.config.providers import ProviderConfig, save_providers
+
+    save_providers(
+        [
+            ProviderConfig(
+                name="opencode-go",
+                api_key="oc-secret",
+                model="deepseek-v4-flash",
+                base_url="https://opencode.ai/zen/go/v1",
+            )
+        ],
+        tmp_path / "p.yaml",
+    )
+    client = LLMClient(
+        default_model="deepseek-v4-flash",
+        providers_file=tmp_path / "p.yaml",
+        provider_name="opencode-go",
+    )
+    req = CompletionRequest(messages=[Message.user("hi")])
+    kwargs = client._base_kwargs(req)
+    assert kwargs["model"] == "openai/deepseek-v4-flash"
+    assert kwargs["api_key"] == "oc-secret"
+    assert kwargs["api_base"] == "https://opencode.ai/zen/go/v1"
+
+
+def test_native_provider_passes_key_only(tmp_path):
+    from eaccode.config.providers import ProviderConfig, save_providers
+
+    save_providers(
+        [ProviderConfig(name="minimax", api_key="mk-secret", model="MiniMax-M3")],
+        tmp_path / "p.yaml",
+    )
+    client = LLMClient(
+        default_model="MiniMax-M3",
+        providers_file=tmp_path / "p.yaml",
+        provider_name="minimax",
+    )
+    kwargs = client._base_kwargs(CompletionRequest(messages=[Message.user("hi")]))
+    assert kwargs["model"] == "minimax/MiniMax-M3"
+    assert kwargs["api_key"] == "mk-secret"
+    assert "api_base" not in kwargs  # native provider: no base URL needed

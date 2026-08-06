@@ -151,12 +151,21 @@ class LLMClient:
         return out
 
     def _base_kwargs(self, req: CompletionRequest) -> dict:
-        return {
+        kwargs = {
             "model": self._resolve_model(req.model),
             "messages": self._to_litellm_messages(req.messages, req.system),
             "max_tokens": req.max_tokens,
             "stream": req.stream,
         }
+        # Pass credentials explicitly: LiteLLM only knows OPENAI_API_KEY for
+        # `openai/`-prefixed custom endpoints, so per-request api_key/api_base
+        # is required for BYOK providers like opencode-go (Task 1.5 finding).
+        provider = self.providers.get(self.provider_name) if self.provider_name else None
+        if provider:
+            kwargs["api_key"] = provider.api_key.get_secret_value()
+            if provider.base_url:
+                kwargs["api_base"] = provider.base_url
+        return kwargs
 
     # ------------------------------------------------------------- complete
 
