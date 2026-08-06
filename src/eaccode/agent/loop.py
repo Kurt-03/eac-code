@@ -9,7 +9,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from eaccode.llm.client import CompletionRequest, LLMClient, TokenUsage
+from eaccode.llm.client import (
+    CompletionRequest,
+    LLMClient,
+    ReasoningDelta,
+    TokenUsage,
+)
 from eaccode.llm.models import Message, TextContent, ToolCall
 from eaccode.permissions.policy import PolicyEngine
 from eaccode.permissions.prompts import prompt_for_permission
@@ -31,6 +36,8 @@ class AgentConfig:
     skills_dir: Path | None = None
     on_tool_call: Callable[[ToolCall], None] | None = None
     on_tool_result: Callable[[ToolCall, object], None] | None = None
+    on_text_delta: Callable[[str], None] | None = None
+    on_reasoning_delta: Callable[[str], None] | None = None
 
 
 @dataclass
@@ -109,6 +116,82 @@ class AgentLoop:
                 )
                 if self.config.on_tool_result:
                     self.config.on_tool_result(tc, result)
+
+        raise MaxTurnsExceededError(
+            f"Reached max_turns={self.config.max_turns} without a final answer"
+        )
+
+    async def run_streaming(
+        self,
+        messages: list[Message],
+        *,
+        on_text_delta: Callable[[str], None] | None = None,
+        on_reasoning_delta: Callable[[str], None] | None = None,
+        on_tool_call: Callable[[ToolCall], None] | None = None,
+        on_tool_result: Callable[[ToolCall, object], None] | None = None,
+    ) -> AgentResult:
+        """Streaming variant of run() (Task 7.3).
+
+        Text deltas and reasoning deltas are delivered live via callbacks;
+        tool calls are still executed with the permission gate and their
+        results returned to the LLM. Streams do not report usage — the
+        result usage stays zero for streaming turns.
+        """
+        tool_schemas = self.executor.registry.schemas()
+        ctx = ToolContext(
+            workdir=self.config.workdir,
+            permission_mode=self.policy.mode.value,
+            skills_dir=self.config.skills_dir or Path(),
+        )
+        total_usage = TokenUsage()
+
+        for turn in range(self.config.max_turns):
+            req = CompletionRequest(
+                messages=messages,
+                tools=tool_schemas,
+                system=self.config.system_prompt,
+                stream=True,
+            )
+            text_parts: list[str] = []
+            tool_calls: list[ToolCall] = []
+            async for chunk in self.client.stream(req):
+                if isinstance(chunk, ReasoningDelta):
+                    if on_reasoning_delta:
+                        on_reasoning_delta(chunk.text)
+                elif isinstance(chunk, ToolCall):
+                    tool_calls.append(chunk)
+                else:
+                    text_parts.append(chunk)
+                    if on_text_delta:
+                        on_text_delta(chunk)
+            text = "".join(text_parts)
+
+            if not tool_calls:
+                messages.append(Message.assistant(text))
+                return AgentResult(
+                    final_text=text,
+                    messages=messages,
+                    usage=total_usage,
+                    turns=turn + 1,
+                    cost_usd=0.0,
+                )
+
+            messages.append(
+                Message.assistant_with_tool_calls(
+                    [TextContent(text=text)] if text else [], tool_calls
+                )
+            )
+            for tc in tool_calls:
+                if on_tool_call:
+                    on_tool_call(tc)
+                result = await self._execute_with_permission(tc, ctx)
+                messages.append(
+                    Message.tool_result(
+                        tc.id, result.content, is_error=result.is_error, name=tc.name
+                    )
+                )
+                if on_tool_result:
+                    on_tool_result(tc, result)
 
         raise MaxTurnsExceededError(
             f"Reached max_turns={self.config.max_turns} without a final answer"

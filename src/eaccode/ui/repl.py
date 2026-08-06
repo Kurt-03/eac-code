@@ -1,7 +1,8 @@
-"""Textual REPL (Task 7.1) — interactive chat with the agent.
+"""Textual REPL (Task 7.1/7.3) — interactive chat with live streaming.
 
-Layout: chat log (top) + input (bottom). Slash commands handled by
+Layout: chat log + live stream preview + input. Slash commands handled by
 ui.commands; agent built by agent.factory (project context + memory + skills).
+Streaming shows text deltas live and tool calls as cards (Task 7.3).
 """
 from __future__ import annotations
 
@@ -10,10 +11,12 @@ from pathlib import Path
 from rich.panel import Panel
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, RichLog
+from textual.widgets import Input, RichLog, Static
 
 from eaccode.agent.factory import build_agent
+from eaccode.llm.models import ToolCall
 from eaccode.memory.store import MemoryStore
+from eaccode.tools.base import ToolResult
 from eaccode.ui.commands import handle_command
 
 
@@ -22,9 +25,16 @@ class EaccodeApp(App):
 
     CSS = """
     #log {
-        height: 90%;
+        height: 80%;
         border: round $primary;
         padding: 0 1;
+    }
+    #stream {
+        height: auto;
+        max-height: 8;
+        color: $text-muted;
+        padding: 0 1;
+        display: none;
     }
     #input {
         height: 3;
@@ -40,13 +50,13 @@ class EaccodeApp(App):
         self.memory_facts: list[str] = []
         self.memory_store: MemoryStore | None = None
         self._agent = None
-        self._client = None
         self._no_providers = False
         self._error = ""
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield RichLog(id="log", wrap=True, markup=True, highlight=True)
+            yield Static(id="stream")
             yield Input(placeholder="Ask eaccode anything... (/help for commands)", id="input")
 
     def on_mount(self) -> None:
@@ -60,8 +70,8 @@ class EaccodeApp(App):
             )
         )
         try:
-            agent, client, sysctx = build_agent(self.workdir)
-            self._agent, self._client = agent, client
+            agent, _, sysctx = build_agent(self.workdir)
+            self._agent = agent
             self.memory_facts = sysctx.memory_facts
             if sysctx.memory_facts:
                 log.write("[dim]Loaded memory:[/dim]")
@@ -78,7 +88,7 @@ class EaccodeApp(App):
         if not text:
             return
         event.input.value = ""
-        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}", border_style="blue"))  # noqa: RUF001 — prompt glyph
+        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}", border_style="blue"))  # noqa: RUF001
 
         if text.startswith("/"):
             result = handle_command(text, self)
@@ -93,34 +103,57 @@ class EaccodeApp(App):
             return
 
         self.messages.append({"role": "user", "content": text})
-        log.write("[dim]eaccode is working…[/dim]")
         try:
-            result = await self._run_agent([self.messages[-1]])
-            log.write(result)
-            self.last_usage = self._agent_last_usage()
+            await self._run_agent_streaming(log)
         except Exception as e:
             log.write(Panel.fit(f"[red]Error: {e}[/red]", border_style="red"))
+        finally:
+            self.query_one("#stream", Static).update("")
 
-    async def _run_agent(self, new_messages: list) -> str:
-        """Run the loop on the full history, return the final text."""
+    async def _run_agent_streaming(self, log: RichLog) -> None:
+        """Run the loop with live streaming: text deltas + tool cards."""
         from eaccode.llm.models import Message
 
-        # rebuild full history from our message list
         history = []
         for m in self.messages:
             if m["role"] == "user":
                 history.append(Message.user(m["content"]))
             else:
                 history.append(Message.assistant(m["content"]))
-        result = await self._agent.run(history)
-        # keep only the assistant text for display history
-        self.messages.append({"role": "assistant", "content": result.final_text})
-        return result.final_text
 
-    def _agent_last_usage(self):
-        if self._agent is not None and hasattr(self._agent, "last_result"):
-            return self._agent.last_result.usage
-        return None
+        stream_box = self.query_one("#stream", Static)
+        stream_box.styles.display = "block"
+
+        def on_text(delta: str) -> None:
+            stream_box.update(stream_box.renderable + delta)
+
+        def on_tool_call(tc: ToolCall) -> None:
+            stream_box.update("")
+            args = ", ".join(f"{k}={v}" for k, v in tc.arguments.items())
+            log.write(Panel.fit(f"[cyan]⚙ {tc.name}({args})[/cyan]", border_style="cyan"))
+
+        def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
+            style = "green" if not result.is_error else "red"
+            icon = "✓" if not result.is_error else "✗"
+            preview = result.content[:400]
+            if len(result.content) > 400:
+                preview += " …"
+            log.write(
+                Panel.fit(
+                    f"[{style}]{icon} {tc.name}[/{style}] {preview}",
+                    border_style=style,
+                )
+            )
+
+        result = await self._agent.run_streaming(
+            history,
+            on_text_delta=on_text,
+            on_tool_call=on_tool_call,
+            on_tool_result=on_tool_result,
+        )
+        stream_box.styles.display = "none"
+        log.write(result.final_text)
+        self.messages.append({"role": "assistant", "content": result.final_text})
 
 
 def run_repl(workdir: Path | None = None) -> None:
