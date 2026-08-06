@@ -1,19 +1,24 @@
 """Textual REPL (Task 7.1/7.3) — interactive chat with live streaming.
 
-Layout: chat log + live stream preview + input. Slash commands handled by
-ui.commands; agent built by agent.factory (project context + memory + skills).
-Streaming shows text deltas live and tool calls as cards (Task 7.3).
+Designed like Claude Code / Hermes: a status header (model · mode · cwd),
+clean message flow (user ">" prompt, assistant answer), compact one-line tool
+cards, live text streaming, and a footer with key bindings.
+
+Selection note: Textual owns the mouse, so the terminal's own text
+selection is disabled while the app runs — use `/copy` to put the last
+assistant answer on the Windows clipboard (clip.exe), or `/copy all`.
 """
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 from rich.panel import Panel
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
-from textual.widgets import Input, RichLog, Static
+from textual.widgets import Footer, Header, Input, RichLog, Static
 
-from eaccode.agent.factory import build_agent
 from eaccode.llm.models import ToolCall
 from eaccode.memory.store import MemoryStore
 from eaccode.tools.base import ToolResult
@@ -22,25 +27,41 @@ from eaccode.ui.commands import handle_command
 
 class EaccodeApp(App):
     TITLE = "eaccode"
+    SUB_TITLE = "autonomous coding agent"
 
     CSS = """
+    Screen {
+        background: $background;
+    }
     #log {
-        height: 80%;
-        border: round $primary;
-        padding: 0 1;
+        height: 1fr;
+        border: none;
+        padding: 1 2;
+        background: $surface;
     }
     #stream {
         height: auto;
-        max-height: 8;
+        max-height: 10;
         color: $text-muted;
-        padding: 0 1;
+        padding: 0 2 0 2;
         display: none;
     }
     #input {
         height: 3;
         border: round $accent;
+        border-title-color: $accent;
+        padding: 0 1;
+        background: $surface;
+    }
+    #input:focus {
+        border: round $primary;
     }
     """
+
+    BINDINGS: ClassVar = [
+        Binding("ctrl+c", "quit", "Quit"),
+        Binding("ctrl+y", "copy_last", "Copy last answer"),
+    ]
 
     def __init__(self, workdir: Path | None = None) -> None:
         super().__init__()
@@ -52,44 +73,61 @@ class EaccodeApp(App):
         self._agent = None
         self._no_providers = False
         self._error = ""
+        self._last_answer = ""
 
     def compose(self) -> ComposeResult:
+        yield Header(show_clock=False)
         with Vertical():
-            yield RichLog(id="log", wrap=True, markup=True, highlight=True)
+            yield RichLog(id="log", wrap=True, markup=True, highlight=False)
             yield Static(id="stream")
-            yield Input(placeholder="Ask eaccode anything... (/help for commands)", id="input")
+            yield Input(placeholder="Ask eaccode anything…  (/help for commands)", id="input")
+        yield Footer()
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
-        log.write(
-            Panel.fit(
-                f"[bold cyan]eaccode[/bold cyan] — coding agent\n"
-                f"workdir: {self.workdir}\n"
-                f"Type /help for commands, /exit to quit.",
-                border_style="cyan",
-            )
-        )
+        self.query_one(Input).focus()  # typing starts immediately
+        log.write("[dim]Welcome to eaccode — autonomous coding agent.[/dim]")
+        log.write("[dim]Ask for code, files, commands, or reviews. "
+                  "Type /help for commands.[/dim]\n")
         try:
+            from eaccode.agent.factory import build_agent_async
             from eaccode.config.paths import EaccodePaths
             from eaccode.tools.mcp.client import connect_mcp_tools
 
-            paths = EaccodePaths()
-            mcp_tools, _mcp_mgr = await connect_mcp_tools(
-                paths.config_dir / "mcp.yaml"
-            )
-            agent, _, sysctx = build_agent(self.workdir, mcp_tools=mcp_tools)
-            self._agent = agent
-            self.memory_facts = sysctx.memory_facts
-            if mcp_tools:
-                log.write(f"[dim]MCP: {len(mcp_tools)} external tool(s) loaded[/dim]")
-            if sysctx.memory_facts:
-                log.write("[dim]Loaded memory:[/dim]")
-                for f in sysctx.memory_facts:
-                    log.write(f"[dim]  • {f}[/dim]")
+            paths_cls = EaccodePaths
+            self.run_worker(self._init_agent(build_agent_async, paths_cls,
+                                             connect_mcp_tools, log), exclusive=True)
         except RuntimeError as e:
             self._no_providers = True
             self._error = str(e)
             log.write(Panel.fit(f"[red]{e}[/red]", border_style="red"))
+
+    async def _init_agent(self, build_agent_async, paths_cls,
+                          connect_mcp_tools, log) -> None:
+        """Async init inside Textual's loop (asyncio.run is forbidden here)."""
+        try:
+            paths = paths_cls()
+            mcp_tools, _mcp_mgr = await connect_mcp_tools(
+                paths.config_dir / "mcp.yaml"
+            )
+            agent, _, sysctx = await build_agent_async(
+                self.workdir, mcp_tools=mcp_tools
+            )
+        except Exception as e:
+            self._no_providers = True
+            self._error = str(e)
+            log.write(Panel.fit(f"[red]{e}[/red]", border_style="red"))
+            return
+        self._agent = agent
+        self.memory_facts = sysctx.memory_facts
+        if mcp_tools:
+            log.write(f"[dim]mcp: {len(mcp_tools)} external tool(s) loaded[/dim]")
+        if sysctx.memory_facts:
+            log.write("[dim]memory:[/dim]")
+            for f in sysctx.memory_facts:
+                log.write(f"[dim]  • {f}[/dim]")
+        log.write("\n[dim]Ready. Ask away — the agent has read, write, bash, "
+                  "grep, web, todo, and skill tools.[/dim]\n")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         log = self.query_one("#log", RichLog)
@@ -97,7 +135,7 @@ class EaccodeApp(App):
         if not text:
             return
         event.input.value = ""
-        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}", border_style="blue"))  # noqa: RUF001
+        log.write(f"[bold blue]❯[/bold blue] [bold]{text}[/bold]")  # noqa: RUF001
 
         if text.startswith("/"):
             result = handle_command(text, self)
@@ -132,27 +170,26 @@ class EaccodeApp(App):
 
         stream_box = self.query_one("#stream", Static)
         stream_box.styles.display = "block"
+        stream_box.update("[dim]… working[/dim]")
+        self._stream_text = ""
 
         def on_text(delta: str) -> None:
-            stream_box.update(stream_box.renderable + delta)
+            self._stream_text += delta
+            stream_box.update(f"[dim]{self._stream_text}[/dim]")
 
         def on_tool_call(tc: ToolCall) -> None:
             stream_box.update("")
+            self._stream_text = ""
             args = ", ".join(f"{k}={v}" for k, v in tc.arguments.items())
-            log.write(Panel.fit(f"[cyan]⚙ {tc.name}({args})[/cyan]", border_style="cyan"))
+            log.write(f"[cyan]⚙ {tc.name}[/cyan][dim]({args})[/dim]")
 
         def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
-            style = "green" if not result.is_error else "red"
-            icon = "✓" if not result.is_error else "✗"
-            preview = result.content[:400]
-            if len(result.content) > 400:
-                preview += " …"
-            log.write(
-                Panel.fit(
-                    f"[{style}]{icon} {tc.name}[/{style}] {preview}",
-                    border_style=style,
-                )
-            )
+            if result.is_error:
+                preview = result.content[:300]
+                log.write(f"[red]✗ {tc.name}[/red] [dim]{preview}[/dim]")
+            else:
+                first_line = result.content.splitlines()[0] if result.content else ""
+                log.write(f"[green]✓ {tc.name}[/green] [dim]{first_line[:120]}[/dim]")
 
         result = await self._agent.run_streaming(
             history,
@@ -161,8 +198,31 @@ class EaccodeApp(App):
             on_tool_result=on_tool_result,
         )
         stream_box.styles.display = "none"
-        log.write(result.final_text)
+        self._last_answer = result.final_text
+        log.write(f"[cyan]eaccode[/cyan]\n{result.final_text}")
         self.messages.append({"role": "assistant", "content": result.final_text})
+
+    def action_copy_last(self) -> None:
+        """Copy the last assistant answer to the Windows clipboard."""
+        if not self._last_answer:
+            self.query_one("#log", RichLog).write(
+                "[dim]Nothing to copy yet.[/dim]"
+            )
+            return
+        import subprocess
+
+        try:
+            subprocess.run(
+                ["clip"], input=self._last_answer.encode("utf-16-le"),
+                check=False,
+            )
+            self.query_one("#log", RichLog).write(
+                "[dim]✓ Last answer copied to clipboard (paste with Ctrl+V)[/dim]"
+            )
+        except Exception as e:
+            self.query_one("#log", RichLog).write(
+                f"[red]✗ Clipboard failed: {e}[/red]"
+            )
 
 
 def run_repl(workdir: Path | None = None) -> None:

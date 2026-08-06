@@ -35,11 +35,35 @@ def build_system_context(
     memory: MemoryStore | None = None,
     ignore_rules: bool = False,
 ) -> SystemContext:
-    """Compose the system prompt from project rules + memory + skills."""
+    """Compose the system prompt (sync — for CLI contexts without a loop)."""
+    import asyncio
+
+    return asyncio.run(
+        build_system_context_async(
+            workdir,
+            skills_dirs=skills_dirs,
+            memory=memory,
+            ignore_rules=ignore_rules,
+        )
+    )
+
+
+async def build_system_context_async(
+    workdir: Path,
+    *,
+    skills_dirs: list[Path] | None = None,
+    memory: MemoryStore | None = None,
+    ignore_rules: bool = False,
+) -> SystemContext:
+    """Compose the system prompt from project rules + memory + skills.
+
+    Async variant — the REPL runs inside Textual's event loop, where
+    asyncio.run() is forbidden ("cannot be called from a running event loop").
+    """
     project_rules = "" if ignore_rules else discover_project_context(workdir)
     memory_facts: list[str] = []
     if memory is not None and not ignore_rules:
-        memory_facts = _recall_sync(memory, workdir)
+        memory_facts = await memory.recall(MemoryStore.project_hash(workdir))
     skills = ""
     if skills_dirs and not ignore_rules:
         skills = skills_to_system_prompt_section(discover_skills(skills_dirs))
@@ -50,12 +74,6 @@ def build_system_context(
         workdir=str(workdir),
     )
     return SystemContext(system_prompt=prompt, memory_facts=memory_facts)
-
-
-def _recall_sync(memory: MemoryStore, workdir: Path) -> list[str]:
-    import asyncio
-
-    return asyncio.run(memory.recall(MemoryStore.project_hash(workdir)))
 
 
 def build_agent(
@@ -70,7 +88,37 @@ def build_agent(
     client_cls: type[LLMClient] | None = None,
     mcp_tools: list | None = None,
 ) -> tuple[AgentLoop, LLMClient, SystemContext]:
-    """Build a fully wired agent (used by `eaccode run` and the REPL)."""
+    """Build a fully wired agent (sync — for `eaccode run` and CLI)."""
+    import asyncio
+
+    return asyncio.run(
+        build_agent_async(
+            workdir,
+            mode=mode,
+            max_turns=max_turns,
+            allowed_tools=allowed_tools,
+            model=model,
+            settings=settings,
+            paths=paths,
+            client_cls=client_cls,
+            mcp_tools=mcp_tools,
+        )
+    )
+
+
+async def build_agent_async(
+    workdir: Path,
+    *,
+    mode: PermissionMode | None = None,
+    max_turns: int | None = None,
+    allowed_tools: list[str] | None = None,
+    model: str | None = None,
+    settings: Settings | None = None,
+    paths: EaccodePaths | None = None,
+    client_cls: type[LLMClient] | None = None,
+    mcp_tools: list | None = None,
+) -> tuple[AgentLoop, LLMClient, SystemContext]:
+    """Build a fully wired agent (async — for the Textual REPL)."""
     paths = paths or EaccodePaths()
     settings = settings or Settings.load(paths.settings_file)
     providers = load_providers(paths.providers_file)
@@ -106,7 +154,7 @@ def build_agent(
     policy = PolicyEngine(mode=mode or settings.permission_mode, rules=RuleSet())
 
     memory = MemoryStore(paths.memory_dir)
-    sysctx = build_system_context(
+    sysctx = await build_system_context_async(
         workdir,
         skills_dirs=[paths.skills_dir],
         memory=memory,

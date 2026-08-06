@@ -10,8 +10,13 @@ HELP_TEXT = """Slash commands:
   /remember <text>      Save a project fact
   /forget <text>        Remove a project fact
   /cost                 Show token usage and cost of the last run
+  /copy                 Copy the last assistant answer to the clipboard
   /clear                Clear conversation history
   /exit                 Exit eaccode
+
+Keys:  Ctrl+C quit · Ctrl+Y copy last answer
+Hint:  Textual owns the mouse, so the terminal's own text selection is
+       disabled — use /copy (last answer) instead.
 """
 
 
@@ -46,6 +51,9 @@ def handle_command(text: str, app) -> CommandResult:
     if cmd == "/clear":
         app.messages = []
         return CommandResult(message="Conversation cleared.")
+    if cmd == "/copy":
+        app.action_copy_last()
+        return CommandResult()
     if cmd == "/memory":
         facts = _get_memory(app)
         if not facts:
