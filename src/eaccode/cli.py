@@ -8,6 +8,7 @@ Command hierarchy (see plan, section "CLI Command Tree"):
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import click
@@ -23,7 +24,15 @@ from eaccode.config.settings import PermissionMode, Settings
 def main(ctx: click.Context) -> None:
     """eaccode — autonomous coding agent (BYOK)."""
     if ctx.invoked_subcommand is None:
-        click.echo("eaccode — REPL arrives in Phase 7. Available commands: eaccode --help")
+        if not sys.stdin.isatty():
+            click.echo(
+                "REPL requires an interactive terminal. "
+                "Use: eaccode run <prompt> (headless)"
+            )
+            return
+        from eaccode.ui.repl import run_repl
+
+        run_repl()
 
 
 @main.command()
@@ -167,45 +176,20 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
     import asyncio
     import json as jsonlib
 
-    from eaccode.agent.loop import AgentConfig, AgentLoop, MaxTurnsExceededError
+    from eaccode.agent.factory import build_agent
+    from eaccode.agent.loop import MaxTurnsExceededError
     from eaccode.config.providers import load_providers
-    from eaccode.llm.client import LLMClient
     from eaccode.llm.models import Message
-    from eaccode.permissions.policy import PolicyEngine
-    from eaccode.permissions.rules import RuleSet
-    from eaccode.tools.factory import build_default_registry
 
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
-    providers = load_providers(paths.providers_file)
-    if not providers:
+    if not load_providers(paths.providers_file):
         click.echo(
             "No providers configured. Add one first:\n"
             "  eaccode providers add --provider minimax --model MiniMax-M3"
         )
         raise SystemExit(1)
 
-    # Resolve the provider: --model override, else default provider
-    if model:
-        from eaccode.llm.model_switch import ModelResolver
-
-        resolved = ModelResolver().resolve(model)
-        provider_name, default_model = resolved.provider, resolved.model
-    else:
-        provider = next(
-            (p for p in providers if p.name == settings.default_provider), providers[0]
-        )
-        provider_name, default_model = provider.name, provider.model
-
-    client = LLMClient(
-        default_model=default_model,
-        providers_file=paths.providers_file,
-        provider_name=provider_name,
-        effort=settings.effort,
-    )
-    registry = build_default_registry(
-        allowed_tools.split(",") if allowed_tools else None
-    )
     # Headless runs are non-interactive: permission prompts would hang or
     # auto-deny. Default to bypassPermissions (like `claude -p` in CI);
     # an explicit --mode override wins. The --allowed-tools whitelist
@@ -215,13 +199,14 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
         if mode_name
         else PermissionMode.BYPASS_PERMISSIONS
     )
-    policy = PolicyEngine(mode=mode, rules=RuleSet())
-    agent = AgentLoop(
-        client, registry, policy,
-        AgentConfig(
-            workdir=Path.cwd(),
-            max_turns=max_turns or settings.max_turns,
-        ),
+    agent, _, _ = build_agent(
+        Path.cwd(),
+        mode=mode,
+        max_turns=max_turns,
+        allowed_tools=allowed_tools.split(",") if allowed_tools else None,
+        model=model,
+        settings=settings,
+        paths=paths,
     )
 
     try:

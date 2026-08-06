@@ -65,8 +65,9 @@ def _setup_env(tmp_path, monkeypatch):
         [ProviderConfig(name="minimax", api_key="mk-test", model="MiniMax-M3")],
         EaccodePaths().providers_file,
     )
-    # Fake the LLM client so no network is needed
-    monkeypatch.setattr("eaccode.llm.client.LLMClient", _MockClient)
+    # Fake the LLM client so no network is needed (resolved at runtime
+    # inside build_agent → patch the factory's reference)
+    monkeypatch.setattr("eaccode.agent.factory.LLMClient", _MockClient)
 
 
 def test_run_headless_writes_file_and_returns_json(tmp_path, monkeypatch):
