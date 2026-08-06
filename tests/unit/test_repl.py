@@ -34,7 +34,7 @@ async def test_repl_submit_plain_message(repl_app, tmp_path):
         inp = app.query_one(Input)
         inp.value = "hello there"
         await pilot.press("enter")
-        lines = [_strip_text(l) for l in log.lines]
+        lines = [_strip_text(line) for line in log.lines]
         assert any("hello there" in line for line in lines)  # user prompt shown
         assert any("stubbed" in line for line in lines)  # error message shown
 
@@ -47,7 +47,7 @@ async def test_repl_slash_help(repl_app, tmp_path):
         inp = app.query_one(Input)
         inp.value = "/help"
         await pilot.press("enter")
-        lines = [_strip_text(l) for l in log.lines]
+        lines = [_strip_text(line) for line in log.lines]
         assert any("Slash commands" in line for line in lines)
         assert any("/copy" in line for line in lines)
 
@@ -88,7 +88,7 @@ async def test_repl_streaming_callbacks(repl_app, tmp_path):
         inp = app.query_one(Input)
         inp.value = "read the file"
         await pilot.press("enter")
-        lines = [_strip_text(l) for l in app.query_one(RichLog).lines]
+        lines = [_strip_text(line) for line in app.query_one(RichLog).lines]
         assert any("⚙ read" in line for line in lines)  # tool card
         assert any("✓ read" in line for line in lines)  # tool result
         assert any("Hello world" in line for line in lines)  # final answer
