@@ -9,10 +9,15 @@ from platformdirs import PlatformDirs
 
 
 def _xdg_or_default(env_var: str, platform_dir: str) -> Path:
-    """XDG-Env-Var ehren, wenn gesetzt (auch auf Windows), sonst platformdirs-Default."""
+    """XDG-Env-Var ehren, wenn gesetzt (auch auf Windows), sonst Plattform-Default."""
     override = os.environ.get(env_var)
     if override:
         return Path(override) / "eaccode"
+    if os.name == "nt":
+        # platformdirs verdoppelt auf Windows den App-Namen (eaccode\\eaccode) —
+        # deshalb hier direkt: %LOCALAPPDATA%\\eaccode
+        local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        return local / "eaccode"
     dirs = PlatformDirs(appname="eaccode", appauthor=None, ensure_exists=True)
     return Path(getattr(dirs, platform_dir))
 

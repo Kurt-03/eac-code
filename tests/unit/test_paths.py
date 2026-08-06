@@ -1,4 +1,5 @@
 """Tests für XDG-Pfad-Auflösung (Task 1.1)."""
+import os
 from pathlib import Path
 
 from eaccode.config.paths import EaccodePaths
@@ -35,3 +36,20 @@ def test_providers_and_settings_files(tmp_path, monkeypatch):
     paths = EaccodePaths()
     assert paths.providers_file == paths.config_dir / "providers.yaml"
     assert paths.settings_file == paths.config_dir / "eaccode.yaml"
+
+
+def test_windows_paths_single_level(tmp_path, monkeypatch):
+    """Auf Windows: %LOCALAPPDATA%\\eaccode — ohne doppelten App-Namen."""
+    if os.name != "nt":
+        import pytest
+
+        pytest.skip("Windows-only Verhalten")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    paths = EaccodePaths()
+    assert paths.config_dir == tmp_path / "eaccode"
+    assert paths.data_dir == tmp_path / "eaccode"
+    assert "eaccode" in paths.cache_dir.parts
+    assert paths.config_dir.parts.count("eaccode") == 1
