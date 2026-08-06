@@ -43,6 +43,7 @@ class BashTool(Tool):
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 proc.kill()
+                await proc.wait()  # reap the process, avoid zombie/unraisable warnings
                 return ToolResult(
                     content=f"Command timed out after {timeout}s",
                     is_error=True,
