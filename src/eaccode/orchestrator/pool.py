@@ -57,7 +57,9 @@ class WorkerPool:
 
 async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
     """Run one headless agent (`eaccode run --print`) for a queued job."""
+    import asyncio
     import json
+    import subprocess
 
     cmd = [
         "eaccode", "run", job.prompt,
@@ -66,20 +68,24 @@ async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
     ]
     if job.tools:
         cmd += ["--allowed-tools", ",".join(job.tools)]
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
+    # subprocess.run in a thread: asyncio subprocesses are unreliable on
+    # Windows (errno 9 / NotImplementedError depending on the loop policy)
+    proc = await asyncio.to_thread(
+        subprocess.run,
+        cmd,
         cwd=str(workdir),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=3600,
     )
-    stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        raise RuntimeError(stderr.decode()[:500])
+        raise RuntimeError((proc.stderr or b"").decode()[:500])
     try:
-        data = json.loads(stdout)
+        data = json.loads(proc.stdout.decode())
         return data.get("result", ""), data.get("cost_usd", 0.0)
     except Exception:
-        return stdout.decode(), 0.0
+        return proc.stdout.decode(), 0.0
 
 
 def make_worktree_runner(worktrees, runner):

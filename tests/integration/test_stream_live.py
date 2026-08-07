@@ -2,14 +2,13 @@
 
 Skips when no providers are configured. Uses the first configured provider.
 """
-import asyncio
 import time
 
 import pytest
 
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.providers import load_providers
-from eaccode.llm.client import LLMClient, CompletionRequest
+from eaccode.llm.client import CompletionRequest, LLMClient
 from eaccode.llm.models import Message
 
 pytestmark = pytest.mark.skipif(

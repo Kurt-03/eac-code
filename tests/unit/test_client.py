@@ -254,7 +254,7 @@ def test_stream_async_thread_producer(tmp_path, monkeypatch):
     import litellm
 
     from eaccode.config.providers import ProviderConfig, save_providers
-    from eaccode.llm.client import LLMClient, ReasoningDelta
+    from eaccode.llm.client import LLMClient
     from eaccode.llm.models import Message, ToolCall
 
     save_providers(
@@ -290,7 +290,6 @@ def test_stream_async_thread_producer(tmp_path, monkeypatch):
     )
 
     async def run():
-        import asyncio
 
         items = []
         async for item in client.stream(
