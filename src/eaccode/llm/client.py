@@ -5,6 +5,7 @@ Provider-specific details (prefix, keys, base URLs) come from providers.yaml.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from collections.abc import AsyncIterator
@@ -271,39 +272,83 @@ class LLMClient:
     async def stream(
         self, req: CompletionRequest
     ) -> AsyncIterator[str | ToolCall | ReasoningDelta]:
-        """Yields text deltas, reasoning deltas, and finally the tool calls."""
+        """Yields text deltas, reasoning deltas, and finally the tool calls.
+
+        litellm's streaming is synchronous — iterating its generator inside
+        the event loop would freeze the UI for seconds per chunk. The sync
+        iteration therefore runs in a worker thread; parsed chunks arrive
+        through an asyncio.Queue, so the UI stays live while tokens flow.
+        """
         kwargs = self._base_kwargs(req)
         if req.temperature is not None:
             kwargs["temperature"] = req.temperature
 
-        response = completion(**kwargs)  # litellm stream=True über req.stream
-        tool_buf: dict[int, dict] = {}
-        for chunk in response:
-            choices = getattr(chunk, "choices", None)
-            if not choices:
-                continue
-            delta = choices[0].delta
-            # reasoning_content (DeepSeek/Qwen/R1) — deliver separately
-            reasoning = getattr(delta, "reasoning_content", None)
-            if reasoning:
-                yield ReasoningDelta(reasoning)
-                continue
-            if delta.content:
-                yield delta.content
-            if getattr(delta, "tool_calls", None):
-                for tc in delta.tool_calls:
-                    idx = tc.index
-                    if idx not in tool_buf:
-                        tool_buf[idx] = {"id": "", "name": "", "arguments": ""}
-                    if tc.id:
-                        tool_buf[idx]["id"] = tc.id
-                    if tc.function.name:
-                        tool_buf[idx]["name"] = tc.function.name
-                    if tc.function.arguments:
-                        tool_buf[idx]["arguments"] += tc.function.arguments
-        for tc in tool_buf.values():
+        queue: asyncio.Queue = asyncio.Queue(maxsize=64)
+        loop = asyncio.get_running_loop()
+
+        def _put(item) -> None:
+            # asyncio.Queue is not thread-safe: put_nowait from a worker
+            # thread would never wake the consumer. call_soon_threadsafe is
+            # the canonical way to hand items into the loop from a thread.
+            loop.call_soon_threadsafe(queue.put_nowait, item)
+
+        def _field(obj, name: str, default=None):
+            """Read a field from either a pydantic object or a plain dict.
+
+            litellm versions differ: ModelResponse.model_validate produces
+            dict deltas in some releases, pydantic objects in others.
+            """
+            if isinstance(obj, dict):
+                return obj.get(name, default)
+            return getattr(obj, name, default)
+
+        def _produce() -> None:
+            """Sync producer: call litellm, parse chunks, queue objects."""
             try:
-                args = json.loads(tc["arguments"])
-            except (json.JSONDecodeError, TypeError):
-                args = {}
-            yield ToolCall(id=tc["id"], name=tc["name"], arguments=args)
+                response = completion(**kwargs)  # stream=True via req.stream
+            except Exception as e:  # deliver errors to the consumer
+                _put(e)
+                return
+            tool_buf: dict[int, dict] = {}
+            for chunk in response:
+                choices = _field(chunk, "choices") or []
+                if not choices:
+                    continue
+                delta = _field(choices[0], "delta") or {}
+                reasoning = _field(delta, "reasoning_content")
+                if reasoning:
+                    _put(ReasoningDelta(reasoning))
+                content = _field(delta, "content")
+                if content:
+                    _put(content)
+                for tc in _field(delta, "tool_calls") or []:
+                    buf = tool_buf.setdefault(
+                        _field(tc, "index") or 0,
+                        {
+                            "id": _field(tc, "id") or "",
+                            "name": _field(_field(tc, "function"), "name") or "",
+                            "args": "",
+                        },
+                    )
+                    args = _field(_field(tc, "function"), "arguments")
+                    if args:
+                        buf["args"] += args
+            for buf in tool_buf.values():
+                try:
+                    args = json.loads(buf["args"]) if buf["args"] else {}
+                except (json.JSONDecodeError, TypeError):
+                    args = {}
+                _put(ToolCall(id=buf["id"], name=buf["name"], arguments=args))
+            _put(None)
+
+        producer = asyncio.create_task(asyncio.to_thread(_produce))
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                if isinstance(item, Exception):
+                    raise item
+                yield item
+        finally:
+            await producer

@@ -135,7 +135,8 @@ class EaccodeApp(App):
         if not text:
             return
         event.input.value = ""
-        log.write(f"[bold blue]❯[/bold blue] [bold]{text}[/bold]")  # noqa: RUF001
+        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}",  # noqa: RUF001
+                            border_style="blue", title="you"))
 
         if text.startswith("/"):
             result = handle_command(text, self)
@@ -181,15 +182,35 @@ class EaccodeApp(App):
             stream_box.update("")
             self._stream_text = ""
             args = ", ".join(f"{k}={v}" for k, v in tc.arguments.items())
-            log.write(f"[cyan]⚙ {tc.name}[/cyan][dim]({args})[/dim]")
+            log.write(
+                Panel.fit(
+                    f"[cyan]⚙ {tc.name}[/cyan] [dim]{args}[/dim]",
+                    border_style="cyan",
+                    title="tool",
+                )
+            )
 
         def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
             if result.is_error:
                 preview = result.content[:300]
-                log.write(f"[red]✗ {tc.name}[/red] [dim]{preview}[/dim]")
+                log.write(
+                    Panel.fit(
+                        f"[red]✗ {tc.name}[/red]\n[dim]{preview}[/dim]",
+                        border_style="red",
+                        title="failed",
+                    )
+                )
             else:
                 first_line = result.content.splitlines()[0] if result.content else ""
-                log.write(f"[green]✓ {tc.name}[/green] [dim]{first_line[:120]}[/dim]")
+                more = len(result.content.splitlines()) - 1
+                extra = f" [dim](+{more} lines)[/dim]" if more > 0 else ""
+                log.write(
+                    Panel.fit(
+                        f"[green]✓ {tc.name}[/green] [dim]{first_line[:150]}[/dim]{extra}",
+                        border_style="green",
+                        title="done",
+                    )
+                )
 
         result = await self._agent.run_streaming(
             history,

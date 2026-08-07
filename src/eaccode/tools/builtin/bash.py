@@ -34,6 +34,7 @@ class BashTool(Tool):
             proc = await asyncio.create_subprocess_shell(
                 input.command,
                 cwd=str(ctx.workdir),
+                stdin=asyncio.subprocess.DEVNULL,  # never steal the terminal's stdin
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env={**os.environ, **ctx.env},

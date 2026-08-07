@@ -18,6 +18,23 @@ from eaccode.config.providers import ProviderConfig, load_providers, save_provid
 from eaccode.config.settings import PermissionMode, Settings
 
 
+def _configure_windows_asyncio() -> None:
+    """Windows: subprocess + asyncio needs the selector policy.
+
+    The default ProactorEventLoop is known to break
+    ``asyncio.create_subprocess_*`` + ``communicate()`` (errno 9 / invalid
+    handle) on Windows. The selector policy fixes it; must run before any
+    event loop is created (Textual creates its own loop at startup).
+    """
+    if sys.platform == "win32":
+        import asyncio
+
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+_configure_windows_asyncio()
+
+
 @click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0", prog_name="eaccode")
 @click.pass_context

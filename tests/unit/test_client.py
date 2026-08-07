@@ -241,3 +241,70 @@ def test_fallback_chain_used_on_retryable_failure(tmp_path, monkeypatch):
     resp = client.complete(CompletionRequest(messages=[Message.user("hi")]))
     assert resp.text == "from fallback"
     assert calls[-1] == "openai/deepseek-v4-flash"  # letzter Versuch lief auf dem Fallback
+
+
+def test_stream_async_thread_producer(tmp_path, monkeypatch):
+    """The stream() producer runs in a thread — the event loop stays live.
+
+    Regression test for the REPL freeze: litellm streaming is synchronous;
+    iterating its generator inline would block the UI for seconds per chunk.
+    """
+    import time
+
+    import litellm
+
+    from eaccode.config.providers import ProviderConfig, save_providers
+    from eaccode.llm.client import LLMClient, ReasoningDelta
+    from eaccode.llm.models import Message, ToolCall
+
+    save_providers(
+        [ProviderConfig(name="minimax", api_key="mk", model="MiniMax-M3")],
+        tmp_path / "p.yaml",
+    )
+
+    def chunk(content, delta=None, tool_calls=None):
+        return litellm.ModelResponse.model_validate({
+            "choices": [{
+                "delta": {
+                    "role": "assistant",
+                    "content": delta,
+                    "tool_calls": tool_calls,
+                }
+            }]
+        })
+
+    def fake_completion(model, messages, **kwargs):
+        assert kwargs.get("stream") is True
+        time.sleep(0.05)  # simulate a slow provider
+        yield chunk("t", delta="Hel")
+        yield chunk("t", delta="lo")
+        yield chunk("t", delta="", tool_calls=[{
+            "index": 0, "id": "c1", "function": {"name": "read", "arguments": '{"path": "x"}'},
+        }])
+
+    monkeypatch.setattr("eaccode.llm.client.completion", fake_completion)
+    client = LLMClient(
+        default_model="MiniMax-M3",
+        providers_file=tmp_path / "p.yaml",
+        provider_name="minimax",
+    )
+
+    async def run():
+        import asyncio
+
+        items = []
+        async for item in client.stream(
+            CompletionRequest(messages=[Message.user("hi")], stream=True)
+        ):
+            items.append(item)
+        return items
+
+    import asyncio as _aio
+
+    items = _aio.run(run())
+    texts = [i for i in items if isinstance(i, str)]
+    tools = [i for i in items if isinstance(i, ToolCall)]
+    assert "".join(texts) == "Hello"
+    assert len(tools) == 1
+    assert tools[0].name == "read"
+    assert tools[0].arguments == {"path": "x"}
