@@ -125,3 +125,19 @@ async def test_repl_verbose_off_hides_successful_tools(repl_app, tmp_path):
         assert not any("⎿" in line for line in lines)  # start hidden
         assert not any("✓ read" in line for line in lines)  # result hidden
         assert any("done" in line for line in lines)  # final answer still there
+
+
+def test_run_repl_passes_initial_messages(tmp_path, monkeypatch):
+    """--continue hands the loaded session into the app (Phase B.5)."""
+    from eaccode.ui.repl import run_repl
+
+    captured = {}
+
+    def fake_run(self):
+        captured["messages"] = self.messages
+        captured["workdir"] = self.workdir
+
+    monkeypatch.setattr(EaccodeApp, "run", fake_run)
+    run_repl(workdir=tmp_path, initial_messages=[{"role": "user", "content": "hi"}])
+    assert captured["messages"] == [{"role": "user", "content": "hi"}]
+    assert captured["workdir"] == tmp_path.resolve()

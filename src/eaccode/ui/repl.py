@@ -334,5 +334,5 @@ class EaccodeApp(App):
             )
 
 
-def run_repl(workdir: Path | None = None) -> None:
-    EaccodeApp(workdir=workdir).run()
+def run_repl(workdir: Path | None = None, initial_messages: list | None = None) -> None:
+    EaccodeApp(workdir=workdir, initial_messages=initial_messages).run()
