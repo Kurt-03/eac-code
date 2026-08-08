@@ -17,6 +17,7 @@ class PermissionMode(StrEnum):
     ACCEPT_EDITS = "acceptEdits"
     PLAN = "plan"
     BYPASS_PERMISSIONS = "bypassPermissions"
+    SMART = "smart"  # auto-approve safe bash, ask on dangerous commands
 
 
 class CuratorSettings(BaseModel):
