@@ -38,7 +38,8 @@ def test_permission_mode_enum_values():
         "acceptEdits",
         "plan",
         "bypassPermissions",
-    }
+        "smart",
+        }
 
 
 def test_max_parallel_agents_validated():
