@@ -5,10 +5,10 @@ from pathlib import Path
 
 import click
 
-from eaccode.config.paths import EaccodePaths
-from eaccode.config.providers import ProviderConfig, load_providers, save_providers
-from eaccode.config.settings import PermissionMode, Settings
 from eaccode.cli import main
+from eaccode.config.paths import EaccodePaths
+from eaccode.config.providers import load_providers
+from eaccode.config.settings import PermissionMode, Settings
 
 # ------------------------------------------------------------------ config
 
@@ -66,7 +66,6 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
 
     from eaccode.agent.factory import build_agent
     from eaccode.agent.loop import MaxTurnsExceededError
-    from eaccode.config.providers import load_providers
     from eaccode.llm.models import Message
 
     paths = EaccodePaths()

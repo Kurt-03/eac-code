@@ -14,8 +14,6 @@ from pathlib import Path
 import click
 
 from eaccode.config.paths import EaccodePaths
-from eaccode.config.providers import ProviderConfig, load_providers, save_providers
-from eaccode.config.settings import PermissionMode, Settings
 
 
 @click.group(invoke_without_command=True)
@@ -76,11 +74,14 @@ def paths() -> None:
 
 
 
-# Sub-command registration (import side effects register on `main`)
-from eaccode.cli import commands_config  # noqa: F401
-from eaccode.cli import commands_curator  # noqa: F401
-from eaccode.cli import commands_mcp  # noqa: F401
-from eaccode.cli import commands_providers  # noqa: F401
-from eaccode.cli import commands_queue  # noqa: F401
-from eaccode.cli import commands_sessions  # noqa: F401
-from eaccode.cli import commands_utility  # noqa: F401
+# Sub-command registration (import side effects register on `main`) —
+# these must run after `main` is defined, hence the late imports
+from eaccode.cli import (  # noqa: E402
+    commands_config,  # noqa: F401
+    commands_curator,  # noqa: F401
+    commands_mcp,  # noqa: F401
+    commands_providers,  # noqa: F401
+    commands_queue,  # noqa: F401
+    commands_sessions,  # noqa: F401
+    commands_utility,  # noqa: F401
+)

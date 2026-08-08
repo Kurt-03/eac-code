@@ -5,10 +5,9 @@ from pathlib import Path
 
 import click
 
-from eaccode.config.paths import EaccodePaths
-from eaccode.config.providers import ProviderConfig, load_providers, save_providers
-from eaccode.config.settings import PermissionMode, Settings
 from eaccode.cli import main
+from eaccode.config.paths import EaccodePaths
+from eaccode.config.settings import Settings
 
 # ------------------------------------------------------------------- queue
 

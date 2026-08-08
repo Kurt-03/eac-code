@@ -1,14 +1,12 @@
 """CLI sub-commands — registered onto the main click group on import."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import click
 
+from eaccode.cli import main
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.providers import ProviderConfig, load_providers, save_providers
-from eaccode.config.settings import PermissionMode, Settings
-from eaccode.cli import main
+from eaccode.config.settings import Settings
 
 # ---------------------------------------------------------------- providers
 

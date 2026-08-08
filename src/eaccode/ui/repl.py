@@ -277,7 +277,7 @@ class EaccodeApp(App):
 
     async def _switch_model_worker(self, name: str, build_agent_async) -> None:
         try:
-            agent, client, _ = await build_agent_async(self.workdir, model=name)
+            agent, _client, _ = await build_agent_async(self.workdir, model=name)
             self._agent = agent
             self._model_name = name
             self.query_one("#log", RichLog).write(

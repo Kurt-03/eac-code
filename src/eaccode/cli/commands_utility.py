@@ -5,11 +5,11 @@ from pathlib import Path
 
 import click
 
-from eaccode.config.paths import EaccodePaths
-from eaccode.config.providers import ProviderConfig, load_providers, save_providers
-from eaccode.config.settings import PermissionMode, Settings
 from eaccode.cli import main
 from eaccode.cli.commands_config import config
+from eaccode.config.paths import EaccodePaths
+from eaccode.config.providers import load_providers
+from eaccode.config.settings import Settings
 
 # ------------------------------------------------------------------- doctor
 
