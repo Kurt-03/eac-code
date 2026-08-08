@@ -36,7 +36,10 @@ class ClassifiedError(Exception):
         self.policy = policy
 
 
-_STATUS_CODE_RE = re.compile(r"status_code[= ](\d{3})|\bHTTP (\d{3})\b|(\d{3}) (Unauthorized|Forbidden|Payment|Not Found|Bad Request)")
+_STATUS_CODE_RE = re.compile(
+    r"status_code[= ](\d{3})|\bHTTP (\d{3})\b|"
+    r"(\d{3}) (Unauthorized|Forbidden|Payment|Not Found|Bad Request)"
+)
 
 
 def _extract_status_code(error: Exception) -> int | None:

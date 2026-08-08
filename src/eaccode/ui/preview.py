@@ -8,6 +8,7 @@ a keyword, no emojis, no boxes. Shell chains are summarized
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 CHEVRON = "⎿"
 
@@ -157,7 +158,7 @@ class VerboseLevel:
     ALL = "all"        # + full arguments
     VERBOSE = "verbose"  # + full result previews
 
-    CYCLE: list[str] = [OFF, NEW, ALL, VERBOSE]
+    CYCLE: ClassVar[list[str]] = [OFF, NEW, ALL, VERBOSE]
 
     @classmethod
     def next(cls, current: str) -> str:

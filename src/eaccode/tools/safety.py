@@ -42,11 +42,9 @@ def is_read_blocked(path: Path) -> bool:
     # keys look like: sk-..., AKIA..., ghp_... — block files whose name
     # contains "key" or "secret" (but not the project's own code)
     lowered = name.lower()
-    if ("key" in lowered or "secret" in lowered) and lowered.endswith(
+    return ("key" in lowered or "secret" in lowered) and lowered.endswith(
         (".txt", ".yaml", ".yml", ".json", ".toml", ".env")
-    ):
-        return True
-    return False
+    )
 
 
 def write_denied_error(path: Path) -> str:
