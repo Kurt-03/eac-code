@@ -14,11 +14,17 @@ from pathlib import Path
 
 import litellm
 from litellm import completion
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from eaccode.config.providers import load_providers
+from eaccode.llm.errors import RetryPolicy, classify_api_error
 from eaccode.llm.model_switch import FallbackChain
 from eaccode.llm.models import Message, ToolCall
+
+
+def _is_transient(exc: Exception) -> bool:
+    """Only transient failures (429/5xx/timeout/unknown) are retried."""
+    return classify_api_error(exc).policy == RetryPolicy.RETRY
 
 
 class ReasoningDelta:
@@ -207,25 +213,38 @@ class LLMClient:
     # ------------------------------------------------------------- complete
 
     def complete(self, req: CompletionRequest) -> CompletionResponse:
-        """Complete with retries, then walk the fallback chain (Task 2.5)."""
+        """Complete with retries, then walk the fallback chain (Task 2.5).
+
+        Error policy (Phase A.4): 400/402 stop immediately (retry can't
+        fix them), 401/403 skip retries and go straight to the fallback
+        provider, 429/5xx/timeouts are retried with backoff, then fallback.
+        """
+        from eaccode.llm.errors import FailoverReason
+
         try:
             return self._complete_with_retry(req)
-        except _RETRYABLE:
+        except Exception as e:
+            classified = classify_api_error(e)
+            if classified.policy == RetryPolicy.STOP:
+                raise  # budget/schema errors are permanent
             if not self.fallback_chain.chain:
                 raise
-            # try each fallback provider once (with its own retries)
+            # auth errors (401/403) skip the retry loop — they already
+            # bypassed it via _is_transient; retries only ran for transient
             for index in range(len(self.fallback_chain.chain)):
                 provider_name, model = self.fallback_chain.chain[index]
                 try:
                     return self._complete_with_retry(req, provider_name, model)
-                except _RETRYABLE:
+                except Exception as fb_e:
+                    if classify_api_error(fb_e).policy == RetryPolicy.STOP:
+                        raise
                     continue
             raise
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception_type(_RETRYABLE),
+        retry=retry_if_exception(_is_transient),
         reraise=True,  # raise the original exception, not tenacity.RetryError
     )
     def _complete_with_retry(
