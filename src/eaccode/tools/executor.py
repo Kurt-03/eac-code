@@ -4,11 +4,28 @@ Converts tool failures into LLM-friendly text so the agent can self-correct.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from eaccode.tools.base import ToolContext, ToolRegistry, ToolResult
+
+MAX_OUTPUT_CHARS = 50_000
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
+def cap_output(text: str, max_chars: int = MAX_OUTPUT_CHARS) -> str:
+    """Truncate tool output to protect the context window (Phase A.3)."""
+    if len(text) <= max_chars:
+        return text
+    head = text[: max_chars * 3 // 4]
+    tail = text[-max_chars // 4 :]
+    return f"{head}\n[...truncated {len(text) - max_chars} chars...]\n{tail}"
 
 
 class ToolExecutor:
@@ -46,4 +63,7 @@ class ToolExecutor:
 
         if result.content:
             result.content = redact_secrets(result.content)
+        # ANSI strip + output cap (Phase A.3): keep the context window safe
+        if result.content:
+            result.content = cap_output(strip_ansi(result.content))
         return result
