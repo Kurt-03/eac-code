@@ -19,8 +19,8 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import Footer, Header, Input, RichLog, Static
 
-from eaccode.llm.models import ToolCall
 from eaccode.llm.client import TokenUsage
+from eaccode.llm.models import ToolCall
 from eaccode.memory.store import MemoryStore
 from eaccode.tools.base import ToolResult
 from eaccode.ui.commands import handle_command
@@ -267,7 +267,6 @@ class EaccodeApp(App):
         from eaccode.agent.factory import build_agent_async
 
         try:
-            import asyncio
 
             self.run_worker(
                 self._switch_model_worker(name, build_agent_async), exclusive=True

@@ -170,4 +170,8 @@ async def build_agent_async(
             system_prompt=sysctx.system_prompt,
         ),
     )
+    # expose the agent builder to delegate_task (Phase C.3)
+    for tool in registry.list():
+        if tool.name == "delegate_task":
+            tool.delegate_builder = build_agent_async
     return agent, client, sysctx

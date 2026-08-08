@@ -28,6 +28,9 @@ class WriteTool(Tool):
         denied = write_denied_error(path)
         if denied:
             return ToolResult(content=denied, is_error=True)
+        from eaccode.tools.checkpoints import save_checkpoint
+
+        save_checkpoint(ctx.workdir, path)  # Phase C.4 snapshot
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(input.content, encoding="utf-8")

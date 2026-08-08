@@ -11,6 +11,7 @@ HELP_TEXT = """Slash commands:
   /verbose              Cycle tool display: off → new → all → verbose
   /undo [N]             Remove the last N exchanges (user+assistant)
   /retry                Re-run the last prompt
+  /rollback [N]         List file checkpoints; restore one with an index
   /memory               Show learned project facts
   /remember <text>      Save a project fact
   /forget <text>        Remove a project fact
@@ -86,6 +87,31 @@ def handle_command(text: str, app) -> CommandResult:
         if not app._last_prompt:
             return CommandResult(message="Nothing to retry yet.")
         return CommandResult(message=app._retry_last())
+    if cmd == "/rollback":
+        from eaccode.tools.checkpoints import (
+            list_checkpoints,
+            restore_checkpoint,
+        )
+
+        cps = list_checkpoints(app.workdir)
+        if not cps:
+            return CommandResult(message="No checkpoints yet.")
+        if not arg:
+            lines = ["Checkpoints:"]
+            for i, cp in enumerate(cps[:20]):
+                lines.append(f"  {i}: {cp.stem} ({cp.stat().st_size} bytes)")
+            lines.append("Restore with: /rollback <N>")
+            return CommandResult(message="\n".join(lines))
+        try:
+            idx = int(arg)
+            cp = cps[idx]
+        except (ValueError, IndexError):
+            return CommandResult(message=f"Invalid checkpoint index: {arg}")
+        if restore_checkpoint(app.workdir, cp):
+            return CommandResult(
+                message=f"✓ Restored {cp.stem} — re-run your last prompt if needed."
+            )
+        return CommandResult(message="Restore failed.")
     if cmd == "/clear":
         app.messages = []
         return CommandResult(message="Conversation cleared.")

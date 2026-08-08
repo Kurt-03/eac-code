@@ -34,6 +34,9 @@ class EditTool(Tool):
         denied = write_denied_error(path)
         if denied:
             return ToolResult(content=denied, is_error=True)
+        from eaccode.tools.checkpoints import save_checkpoint
+
+        save_checkpoint(ctx.workdir, path)  # Phase C.4 snapshot
         if not path.exists():
             return ToolResult(content=f"Error: file not found: {path}", is_error=True)
         try:

@@ -12,6 +12,9 @@ from eaccode.tools.builtin.write import WriteTool
 
 def _all_tools() -> list[Tool]:
     from eaccode.memory.skill_tools import SkillCreateTool, SkillListTool, SkillPatchTool
+    from eaccode.tools.builtin.clarify import ClarifyTool
+    from eaccode.tools.builtin.delegate import DelegateTool
+    from eaccode.tools.builtin.execute_code import ExecuteCodeTool
 
     return [
         ReadTool(),
@@ -23,6 +26,9 @@ def _all_tools() -> list[Tool]:
         SkillCreateTool(),
         SkillPatchTool(),
         SkillListTool(),
+        ClarifyTool(),
+        ExecuteCodeTool(),
+        DelegateTool(),
     ]
 
 
