@@ -1,5 +1,4 @@
 """Tests for API error classification (Phase A.4)."""
-import pytest
 
 from eaccode.llm.errors import (
     FailoverReason,

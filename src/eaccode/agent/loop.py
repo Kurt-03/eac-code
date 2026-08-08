@@ -13,6 +13,7 @@ from eaccode.llm.client import (
     CompletionRequest,
     LLMClient,
     ReasoningDelta,
+    StreamUsage,
     TokenUsage,
 )
 from eaccode.llm.models import Message, TextContent, ToolCall
@@ -160,6 +161,12 @@ class AgentLoop:
                         on_reasoning_delta(chunk.text)
                 elif isinstance(chunk, ToolCall):
                     tool_calls.append(chunk)
+                elif isinstance(chunk, StreamUsage):
+                    total_usage += TokenUsage(
+                        input_tokens=chunk.input_tokens,
+                        output_tokens=chunk.output_tokens,
+                        cost_usd=chunk.cost_usd,
+                    )
                 else:
                     text_parts.append(chunk)
                     if on_text_delta:
@@ -173,7 +180,7 @@ class AgentLoop:
                     messages=messages,
                     usage=total_usage,
                     turns=turn + 1,
-                    cost_usd=0.0,
+                    cost_usd=total_usage.cost_usd,
                 )
 
             messages.append(

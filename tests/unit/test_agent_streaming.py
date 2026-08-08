@@ -98,3 +98,22 @@ async def test_run_streaming_respects_max_turns(tmp_path):
     )
     with pytest.raises(MaxTurnsExceededError):
         await agent.run_streaming([Message.user("hi")])
+
+
+@pytest.mark.asyncio
+async def test_run_streaming_reports_usage(tmp_path):
+    """The stream's final usage chunk reaches AgentResult (Phase A.6)."""
+    from eaccode.llm.client import StreamUsage
+
+    class WithUsage(StreamingMockClient):
+        async def stream(self, req):
+            yield "hi"
+            yield StreamUsage(input_tokens=100, output_tokens=25, cost_usd=0.01)
+
+    reg = ToolRegistry()
+    policy = PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet())
+    agent = AgentLoop(WithUsage(), reg, policy, AgentConfig(workdir=tmp_path))
+    result = await agent.run_streaming([Message.user("hi")])
+    assert result.usage.input_tokens == 100
+    assert result.usage.output_tokens == 25
+    assert result.cost_usd == 0.01

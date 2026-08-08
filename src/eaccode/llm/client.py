@@ -35,6 +35,15 @@ class ReasoningDelta:
         self.text = text
 
 
+class StreamUsage:
+    """Usage reported at the end of a stream (OpenAI-compatible)."""
+
+    def __init__(self, input_tokens: int = 0, output_tokens: int = 0, cost_usd: float = 0.0):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.cost_usd = cost_usd
+
+
 @dataclass
 class TokenUsage:
     input_tokens: int = 0
@@ -219,7 +228,6 @@ class LLMClient:
         fix them), 401/403 skip retries and go straight to the fallback
         provider, 429/5xx/timeouts are retried with backoff, then fallback.
         """
-        from eaccode.llm.errors import FailoverReason
 
         try:
             return self._complete_with_retry(req)
@@ -329,9 +337,17 @@ class LLMClient:
                 _put(e)
                 return
             tool_buf: dict[int, dict] = {}
+            usage = None
             for chunk in response:
                 choices = _field(chunk, "choices") or []
                 if not choices:
+                    # final chunk carries usage (OpenAI-compatible streams)
+                    u = _field(chunk, "usage")
+                    if u and (_field(u, "prompt_tokens") or _field(u, "completion_tokens")):
+                        usage = StreamUsage(
+                            input_tokens=_field(u, "prompt_tokens") or 0,
+                            output_tokens=_field(u, "completion_tokens") or 0,
+                        )
                     continue
                 delta = _field(choices[0], "delta") or {}
                 reasoning = _field(delta, "reasoning_content")
@@ -358,6 +374,8 @@ class LLMClient:
                 except (json.JSONDecodeError, TypeError):
                     args = {}
                 _put(ToolCall(id=buf["id"], name=buf["name"], arguments=args))
+            if usage:
+                _put(usage)
             _put(None)
 
         producer = asyncio.create_task(asyncio.to_thread(_produce))
