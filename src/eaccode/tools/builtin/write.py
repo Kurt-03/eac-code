@@ -23,6 +23,11 @@ class WriteTool(Tool):
         path = Path(input.path)
         if not path.is_absolute():
             path = ctx.workdir / path
+        from eaccode.tools.safety import write_denied_error
+
+        denied = write_denied_error(path)
+        if denied:
+            return ToolResult(content=denied, is_error=True)
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(input.content, encoding="utf-8")

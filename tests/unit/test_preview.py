@@ -3,7 +3,6 @@ from eaccode.ui.preview import (
     CHEVRON,
     VerboseLevel,
     build_call_card,
-    build_tool_preview,
     summarize_shell_command,
 )
 

@@ -26,9 +26,14 @@ class EditTool(Tool):
     requires_permission = True
 
     async def run(self, input: EditInput, ctx: ToolContext) -> ToolResult:
+        from eaccode.tools.safety import write_denied_error
+
         path = Path(input.path)
         if not path.is_absolute():
             path = ctx.workdir / path
+        denied = write_denied_error(path)
+        if denied:
+            return ToolResult(content=denied, is_error=True)
         if not path.exists():
             return ToolResult(content=f"Error: file not found: {path}", is_error=True)
         try:

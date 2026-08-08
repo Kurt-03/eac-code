@@ -28,9 +28,14 @@ class ReadTool(Tool):
     requires_permission = False
 
     async def run(self, input: ReadInput, ctx: ToolContext) -> ToolResult:
+        from eaccode.tools.safety import read_blocked_error
+
         path = Path(input.path)
         if not path.is_absolute():
             path = ctx.workdir / path
+        blocked = read_blocked_error(path)
+        if blocked:
+            return ToolResult(content=blocked, is_error=True)
         if not path.exists():
             return ToolResult(content=f"Error: file not found: {path}", is_error=True)
         try:
