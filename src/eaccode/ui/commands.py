@@ -5,8 +5,12 @@ from dataclasses import dataclass
 
 HELP_TEXT = """Slash commands:
   /help                 Show this help
-  /mode <name>          Switch permission mode (default|acceptEdits|plan|bypassPermissions)
+  /mode <name>          Switch permission mode (default|acceptEdits|plan|smart|bypassPermissions)
+  /model <name>         Switch model/provider for the next turns (e.g. /model opencode-go)
+  /reasoning [on|off]   Show or hide the model's reasoning tokens
   /verbose              Cycle tool display: off → new → all → verbose
+  /undo [N]             Remove the last N exchanges (user+assistant)
+  /retry                Re-run the last prompt
   /memory               Show learned project facts
   /remember <text>      Save a project fact
   /forget <text>        Remove a project fact
@@ -15,7 +19,7 @@ HELP_TEXT = """Slash commands:
   /clear                Clear conversation history
   /exit                 Exit eaccode
 
-Keys:  Ctrl+C quit · Ctrl+Y copy last answer
+Keys:  Ctrl+C cancel/quit · Ctrl+Y copy last answer
 Hint:  Textual owns the mouse, so the terminal's own text selection is
        disabled — use /copy (last answer) instead.
 """
@@ -44,11 +48,44 @@ def handle_command(text: str, app) -> CommandResult:
 
             new_mode = PermissionMode(arg)
             app.policy.mode = new_mode
+            app._mode_name = arg
             return CommandResult(message=f"Mode set to {arg}")
         except ValueError:
             return CommandResult(
-                message="Unknown mode. Valid: default, acceptEdits, plan, bypassPermissions"
+                message="Unknown mode. Valid: default, acceptEdits, plan, smart, bypassPermissions"
             )
+    if cmd == "/model":
+        if not arg:
+            return CommandResult(
+                message=f"Current model: {app._model_name or 'default'} (Usage: /model <name>)"
+            )
+        return CommandResult(message=app._switch_model(arg))
+    if cmd == "/reasoning":
+        if arg in ("on", "1", "true"):
+            app._show_reasoning = True
+            return CommandResult(message="Reasoning display: on")
+        if arg in ("off", "0", "false"):
+            app._show_reasoning = False
+            return CommandResult(message="Reasoning display: off")
+        app._show_reasoning = not app._show_reasoning
+        return CommandResult(message=f"Reasoning display: {'on' if app._show_reasoning else 'off'}")
+    if cmd == "/undo":
+        n = 1
+        if arg:
+            try:
+                n = max(1, int(arg))
+            except ValueError:
+                return CommandResult(message="Usage: /undo [N]")
+        removed = 0
+        while n > 0 and app.messages:
+            app.messages.pop()
+            removed += 1
+            n -= 1
+        return CommandResult(message=f"Removed {removed} message(s).")
+    if cmd == "/retry":
+        if not app._last_prompt:
+            return CommandResult(message="Nothing to retry yet.")
+        return CommandResult(message=app._retry_last())
     if cmd == "/clear":
         app.messages = []
         return CommandResult(message="Conversation cleared.")

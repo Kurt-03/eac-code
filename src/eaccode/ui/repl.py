@@ -20,6 +20,7 @@ from textual.containers import Vertical
 from textual.widgets import Footer, Header, Input, RichLog, Static
 
 from eaccode.llm.models import ToolCall
+from eaccode.llm.client import TokenUsage
 from eaccode.memory.store import MemoryStore
 from eaccode.tools.base import ToolResult
 from eaccode.ui.commands import handle_command
@@ -59,14 +60,15 @@ class EaccodeApp(App):
     """
 
     BINDINGS: ClassVar = [
-        Binding("ctrl+c", "quit", "Quit"),
+        Binding("ctrl+c", "quit_or_cancel", "Quit/Cancel"),
         Binding("ctrl+y", "copy_last", "Copy last answer"),
     ]
 
-    def __init__(self, workdir: Path | None = None) -> None:
+    def __init__(self, workdir: Path | None = None,
+                 initial_messages: list | None = None) -> None:
         super().__init__()
         self.workdir = (workdir or Path.cwd()).resolve()
-        self.messages: list = []
+        self.messages: list = initial_messages or []
         self.last_usage = None
         self.memory_facts: list[str] = []
         self.memory_store: MemoryStore | None = None
@@ -74,7 +76,14 @@ class EaccodeApp(App):
         self._no_providers = False
         self._error = ""
         self._last_answer = ""
+        self._last_prompt = ""
         self.verbose_level = "new"  # tool display: off|new|all|verbose
+        self._busy = False
+        self._current_task = None
+        self._model_name = ""
+        self._mode_name = ""
+        self._show_reasoning = False
+        self._total_usage = TokenUsage()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -152,11 +161,20 @@ class EaccodeApp(App):
             return
 
         self.messages.append({"role": "user", "content": text})
+        self._last_prompt = text
+        self._busy = True
         try:
-            await self._run_agent_streaming(log)
+            import asyncio
+
+            self._current_task = asyncio.create_task(self._run_agent_streaming(log))
+            await self._current_task
+        except asyncio.CancelledError:
+            log.write("[yellow]⏹ run cancelled[/yellow]")
         except Exception as e:
             log.write(Panel.fit(f"[red]Error: {e}[/red]", border_style="red"))
         finally:
+            self._busy = False
+            self._current_task = None
             self.query_one("#stream", Static).update("")
 
     async def _run_agent_streaming(self, log: RichLog) -> None:
@@ -225,6 +243,74 @@ class EaccodeApp(App):
         self._last_answer = result.final_text
         log.write(f"[cyan]eaccode[/cyan]\n{result.final_text}")
         self.messages.append({"role": "assistant", "content": result.final_text})
+        # Status bar (Phase B.2): model · mode · tokens · cost
+        self._total_usage += result.usage
+        self.sub_title = (
+            f"{self._model_name or '?'} · {self._mode_name or self._agent.policy.mode.value} · "
+            f"{self._total_usage.input_tokens + self._total_usage.output_tokens} tok · "
+            f"${self._total_usage.cost_usd:.4f}"
+        )
+
+    def action_quit_or_cancel(self) -> None:
+        """Ctrl+C: cancel a running agent, otherwise quit the app."""
+        if self._busy and self._current_task:
+            self._current_task.cancel()
+            self.query_one("#log", RichLog).write(
+                "[yellow]⏹ interrupted by user[/yellow]"
+            )
+            self._busy = False
+            return
+        self.exit()
+
+    def _switch_model(self, name: str) -> str:
+        """/model: rebuild the agent with another provider/model (Phase B.4)."""
+        from eaccode.agent.factory import build_agent_async
+
+        try:
+            import asyncio
+
+            self.run_worker(
+                self._switch_model_worker(name, build_agent_async), exclusive=True
+            )
+            return f"Switching model to '{name}'..."
+        except Exception as e:
+            return f"Model switch failed: {e}"
+
+    async def _switch_model_worker(self, name: str, build_agent_async) -> None:
+        try:
+            agent, client, _ = await build_agent_async(self.workdir, model=name)
+            self._agent = agent
+            self._model_name = name
+            self.query_one("#log", RichLog).write(
+                f"[green]✓ model switched to {name}[/green]"
+            )
+            self.sub_title = f"{name} · {self._mode_name or agent.policy.mode.value}"
+        except Exception as e:
+            self.query_one("#log", RichLog).write(
+                f"[red]✗ model switch failed: {e}[/red]"
+            )
+
+    def _retry_last(self) -> str:
+        """/retry: re-run the last user prompt (Phase B.3)."""
+        import asyncio
+
+        self._busy = True
+        log = self.query_one("#log", RichLog)
+
+        async def _run() -> None:
+            try:
+                self._current_task = asyncio.current_task()
+                await self._run_agent_streaming(log)
+            except asyncio.CancelledError:
+                log.write("[yellow]⏹ run cancelled[/yellow]")
+            except Exception as e:
+                log.write(Panel.fit(f"[red]Error: {e}[/red]", border_style="red"))
+            finally:
+                self._busy = False
+                self._current_task = None
+
+        self.run_worker(_run(), exclusive=True)
+        return f"Retrying: {self._last_prompt}"
 
     def action_copy_last(self) -> None:
         """Copy the last assistant answer to the Windows clipboard."""

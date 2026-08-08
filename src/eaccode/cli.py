@@ -20,8 +20,12 @@ from eaccode.config.settings import PermissionMode, Settings
 
 @click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0", prog_name="eaccode")
+@click.option("--continue", "continue_session", is_flag=True,
+              help="Resume the most recent session in the REPL")
+@click.option("--resume", "resume_id", default=None,
+              help="Resume a session by ID in the REPL")
 @click.pass_context
-def main(ctx: click.Context) -> None:
+def main(ctx: click.Context, continue_session: bool, resume_id: str | None) -> None:
     """eaccode — autonomous coding agent (BYOK)."""
     if ctx.invoked_subcommand is None:
         if not sys.stdin.isatty():
@@ -32,7 +36,31 @@ def main(ctx: click.Context) -> None:
             return
         from eaccode.ui.repl import run_repl
 
-        run_repl()
+        initial_messages = None
+        workdir = None
+        if continue_session or resume_id:
+            import asyncio
+
+            from eaccode.sessions.store import SessionStore
+
+            store = SessionStore(EaccodePaths().sessions_dir / "sessions.db")
+            session = None
+            if resume_id:
+                session = asyncio.run(store.load(resume_id))
+            else:
+                recent = asyncio.run(store.list_sessions(limit=1))
+                if recent:
+                    session = asyncio.run(store.load(recent[0].id))
+            if session:
+                initial_messages = [
+                    {"role": m.role.value, "content": m.text}
+                    for m in session.messages
+                    if m.role.value in ("user", "assistant") and m.text
+                ]
+                workdir = session.metadata.get("cwd") or None
+                click.echo(f"Resumed session: {session.title}")
+        run_repl(workdir=Path(workdir) if workdir else None,
+                 initial_messages=initial_messages)
 
 
 @main.command()

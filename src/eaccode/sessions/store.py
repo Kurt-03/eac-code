@@ -22,6 +22,15 @@ class Session(BaseModel):
     updated_at: datetime
 
 
+def generate_title(messages: list[Message], max_len: int = 40) -> str:
+    """Derive a session title from the first user message (Phase B.5)."""
+    for m in messages:
+        if m.role.value == "user" and m.text:
+            cleaned = " ".join(m.text.split())
+            return cleaned[:max_len] + ("..." if len(cleaned) > max_len else "")
+    return "untitled"
+
+
 class SessionStore:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
@@ -59,6 +68,8 @@ class SessionStore:
     ) -> str:
         sid = session_id or str(uuid.uuid4())
         now = datetime.now().isoformat()
+        if not title or title == "untitled":
+            title = generate_title(messages)
         # Redact credential-like strings before anything hits disk (Phase A.2)
         from eaccode.security.redact import redact_secrets
 
