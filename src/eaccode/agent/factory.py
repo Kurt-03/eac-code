@@ -21,6 +21,12 @@ from eaccode.permissions.policy import PolicyEngine
 from eaccode.permissions.rules import RuleSet
 from eaccode.tools.factory import build_default_registry
 
+# System-prompt cache (Phase D.2): the prompt has a stable structure
+# (identity → rules → memory → skills → behavior) so providers can cache
+# the prefix; memoizing the build keeps repeated constructions identical.
+_prompt_cache: dict[tuple, SystemContext] = {}
+_PROMPT_CACHE_MAX = 32
+
 
 @dataclass
 class SystemContext:
@@ -67,13 +73,23 @@ async def build_system_context_async(
     skills = ""
     if skills_dirs and not ignore_rules:
         skills = skills_to_system_prompt_section(discover_skills(skills_dirs))
+    key = (
+        str(workdir), project_rules, tuple(memory_facts), skills, ignore_rules,
+    )
+    cached = _prompt_cache.get(key)
+    if cached is not None:
+        return cached
     prompt = build_system_prompt(
         project_rules=project_rules,
         memory_facts=memory_facts,
         skills=skills,
         workdir=str(workdir),
     )
-    return SystemContext(system_prompt=prompt, memory_facts=memory_facts)
+    ctx = SystemContext(system_prompt=prompt, memory_facts=memory_facts)
+    if len(_prompt_cache) >= _PROMPT_CACHE_MAX:
+        _prompt_cache.clear()
+    _prompt_cache[key] = ctx
+    return ctx
 
 
 def build_agent(
