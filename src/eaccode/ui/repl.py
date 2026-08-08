@@ -74,6 +74,7 @@ class EaccodeApp(App):
         self._no_providers = False
         self._error = ""
         self._last_answer = ""
+        self.verbose_level = "new"  # tool display: off|new|all|verbose
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -173,6 +174,8 @@ class EaccodeApp(App):
         stream_box.styles.display = "block"
         stream_box.update("[dim]… working[/dim]")
         self._stream_text = ""
+        self._tool_starts: dict[str, float] = {}
+        from eaccode.ui.preview import CHEVRON, VerboseLevel, build_call_card
 
         def on_text(delta: str) -> None:
             self._stream_text += delta
@@ -181,36 +184,36 @@ class EaccodeApp(App):
         def on_tool_call(tc: ToolCall) -> None:
             stream_box.update("")
             self._stream_text = ""
-            args = ", ".join(f"{k}={v}" for k, v in tc.arguments.items())
-            log.write(
-                Panel.fit(
-                    f"[cyan]⚙ {tc.name}[/cyan] [dim]{args}[/dim]",
-                    border_style="cyan",
-                    title="tool",
+            import time
+
+            self._tool_starts[tc.id] = time.monotonic()
+            if VerboseLevel.show_start(self.verbose_level):
+                card = build_call_card(
+                    tc.name, tc.arguments,
+                    full_args=VerboseLevel.show_full_args(self.verbose_level),
                 )
-            )
+                log.write(f"[dim]{CHEVRON} {card.call}[/dim]")
 
         def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
-            if result.is_error:
-                preview = result.content[:300]
-                log.write(
-                    Panel.fit(
-                        f"[red]✗ {tc.name}[/red]\n[dim]{preview}[/dim]",
-                        border_style="red",
-                        title="failed",
-                    )
-                )
-            else:
-                first_line = result.content.splitlines()[0] if result.content else ""
-                more = len(result.content.splitlines()) - 1
-                extra = f" [dim](+{more} lines)[/dim]" if more > 0 else ""
-                log.write(
-                    Panel.fit(
-                        f"[green]✓ {tc.name}[/green] [dim]{first_line[:150]}[/dim]{extra}",
-                        border_style="green",
-                        title="done",
-                    )
-                )
+            import time
+
+            duration = None
+            start = self._tool_starts.pop(tc.id, None)
+            if start is not None:
+                duration = time.monotonic() - start
+            if not VerboseLevel.show_result(self.verbose_level, result.is_error):
+                return
+            card = build_call_card(
+                tc.name, tc.arguments, result=result.content,
+                is_error=result.is_error, duration_s=duration,
+                result_max=140 if self.verbose_level == VerboseLevel.VERBOSE else 90,
+                full_args=VerboseLevel.show_full_args(self.verbose_level),
+            )
+            mark = "✗" if result.is_error else "✓"
+            style = "red" if result.is_error else "green"
+            duration_txt = f" · {duration:.1f}s" if duration is not None else ""
+            preview_txt = f" {card.result_preview}" if card.result_preview else ""
+            log.write(f"  [{style}]{mark}[/{style}] {card.name}{duration_txt}{preview_txt}")
 
         result = await self._agent.run_streaming(
             history,

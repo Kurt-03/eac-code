@@ -6,6 +6,7 @@ from dataclasses import dataclass
 HELP_TEXT = """Slash commands:
   /help                 Show this help
   /mode <name>          Switch permission mode (default|acceptEdits|plan|bypassPermissions)
+  /verbose              Cycle tool display: off → new → all → verbose
   /memory               Show learned project facts
   /remember <text>      Save a project fact
   /forget <text>        Remove a project fact
@@ -54,6 +55,11 @@ def handle_command(text: str, app) -> CommandResult:
     if cmd == "/copy":
         app.action_copy_last()
         return CommandResult()
+    if cmd == "/verbose":
+        from eaccode.ui.preview import VerboseLevel
+
+        app.verbose_level = VerboseLevel.next(app.verbose_level)
+        return CommandResult(message=f"Tool display: {app.verbose_level}")
     if cmd == "/memory":
         facts = _get_memory(app)
         if not facts:

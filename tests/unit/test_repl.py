@@ -89,6 +89,39 @@ async def test_repl_streaming_callbacks(repl_app, tmp_path):
         inp.value = "read the file"
         await pilot.press("enter")
         lines = [_strip_text(line) for line in app.query_one(RichLog).lines]
-        assert any("⚙ read" in line for line in lines)  # tool card
+        assert any("⎿ read(path=" in line for line in lines)  # tool call line
         assert any("✓ read" in line for line in lines)  # tool result
         assert any("Hello world" in line for line in lines)  # final answer
+
+
+@pytest.mark.asyncio
+async def test_repl_verbose_off_hides_successful_tools(repl_app, tmp_path):
+    """/verbose off → only failed tool calls are shown."""
+    from eaccode.agent.loop import AgentResult
+    from eaccode.llm.client import TokenUsage
+    from eaccode.llm.models import ToolCall
+    from eaccode.tools.base import ToolResult
+
+    class FakeAgent:
+        async def run_streaming(self, history, **kwargs):
+            kwargs["on_tool_call"](ToolCall(id="1", name="read", arguments={"path": "x.py"}))
+            kwargs["on_tool_result"](
+                ToolCall(id="1", name="read", arguments={"path": "x.py"}),
+                ToolResult(content="1 line"),
+            )
+            return AgentResult(
+                final_text="done", messages=[], usage=TokenUsage(), turns=1, cost_usd=0.0
+            )
+
+    app = repl_app(workdir=tmp_path)
+    async with app.run_test() as pilot:
+        app._agent = FakeAgent()
+        app._no_providers = False
+        app.verbose_level = "off"
+        inp = app.query_one(Input)
+        inp.value = "go"
+        await pilot.press("enter")
+        lines = [_strip_text(line) for line in app.query_one(RichLog).lines]
+        assert not any("⎿" in line for line in lines)  # start hidden
+        assert not any("✓ read" in line for line in lines)  # result hidden
+        assert any("done" in line for line in lines)  # final answer still there
