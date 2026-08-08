@@ -34,9 +34,16 @@ class ToolExecutor:
             )
         context = ctx or ToolContext(workdir=workdir)
         try:
-            return await tool.run(input_model, context)
+            result = await tool.run(input_model, context)
         except Exception as e:
-            return ToolResult(
+            result = ToolResult(
                 content=f"Error executing {name}: {type(e).__name__}: {e}",
                 is_error=True,
             )
+        # Secret redaction (Phase A.2): credential-like strings must never
+        # enter the conversation context (and from there, session logs).
+        from eaccode.security.redact import redact_secrets
+
+        if result.content:
+            result.content = redact_secrets(result.content)
+        return result

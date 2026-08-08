@@ -59,7 +59,15 @@ class SessionStore:
     ) -> str:
         sid = session_id or str(uuid.uuid4())
         now = datetime.now().isoformat()
-        msgs_json = json.dumps([m.model_dump(mode="json") for m in messages])
+        # Redact credential-like strings before anything hits disk (Phase A.2)
+        from eaccode.security.redact import redact_secrets
+
+        msgs = [
+            m.model_copy(update={"text": redact_secrets(m.text)})
+            if m.text else m
+            for m in messages
+        ]
+        msgs_json = json.dumps([m.model_dump(mode="json") for m in msgs])
         meta_json = json.dumps(metadata or {})
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
