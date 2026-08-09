@@ -24,6 +24,7 @@ from eaccode.llm.models import ToolCall
 from eaccode.memory.store import MemoryStore
 from eaccode.tools.base import ToolResult
 from eaccode.ui.commands import handle_command
+from eaccode.ui.suggester import SlashCommandSuggester
 
 
 class EaccodeApp(App):
@@ -62,6 +63,7 @@ class EaccodeApp(App):
     BINDINGS: ClassVar = [
         Binding("ctrl+c", "quit_or_cancel", "Quit/Cancel"),
         Binding("ctrl+y", "copy_last", "Copy last answer"),
+        Binding("ctrl+k", "open_palette", "Command palette"),
     ]
 
     def __init__(self, workdir: Path | None = None,
@@ -72,6 +74,8 @@ class EaccodeApp(App):
         self.last_usage = None
         self.memory_facts: list[str] = []
         self.memory_store: MemoryStore | None = None
+        self.loaded_skills: list[str] = []
+        self._session_touched: set[str] = set()
         self._agent = None
         self._no_providers = False
         self._error = ""
@@ -84,13 +88,18 @@ class EaccodeApp(App):
         self._mode_name = ""
         self._show_reasoning = False
         self._total_usage = TokenUsage()
+        self._suggester = SlashCommandSuggester(cwd=self.workdir)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical():
             yield RichLog(id="log", wrap=True, markup=True, highlight=False)
             yield Static(id="stream")
-            yield Input(placeholder="Ask eaccode anything…  (/help for commands)", id="input")
+            yield Input(
+                placeholder="Ask eaccode anything…  (/help for commands)",
+                id="input",
+                suggester=self._suggester,  # Phase F.2: slash/@/path completion
+            )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -250,6 +259,29 @@ class EaccodeApp(App):
             f"{self._total_usage.input_tokens + self._total_usage.output_tokens} tok · "
             f"${self._total_usage.cost_usd:.4f}"
         )
+
+    def action_open_palette(self) -> None:
+        """Ctrl+K: open the filterable command palette (Phase F.3)."""
+        from eaccode.ui.command_palette import CommandPalette
+
+        def run(name: str) -> None:
+            log = self.query_one("#log", RichLog)
+            result = handle_command(name, self)
+            if result.message:
+                log.write(result.message)
+            if result.should_exit:
+                self.exit()
+
+        self.push_screen(CommandPalette(on_run=run))
+
+    def _toggle_skill(self, name: str, enable: bool) -> None:
+        """Session skill toggle for /skills (Phase G.6)."""
+        if enable:
+            if name not in self.loaded_skills:
+                self.loaded_skills.append(name)
+        else:
+            if name in self.loaded_skills:
+                self.loaded_skills.remove(name)
 
     def action_quit_or_cancel(self) -> None:
         """Ctrl+C: cancel a running agent, otherwise quit the app."""

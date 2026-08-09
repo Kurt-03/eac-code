@@ -31,12 +31,19 @@ async def test_bash_survives_timeout_then_reruns(tmp_path):
     grandchild holding the captured pipe handles; the next run then hit
     OSError(9) 'Bad file descriptor' or hung forever on the reader join.
     """
+    # Sleep via a script FILE — inline `python -c '...'` breaks under
+    # Windows cmd (no single-quote support) and would produce a
+    # SyntaxError instead of the timeout we're testing for. The venv
+    # python path contains spaces ("EACcode V3"), so quote it for shell.
+    sleeper = tmp_path / "sleeper.py"
+    sleeper.write_text("import time; time.sleep(5)", encoding="utf-8")
     tool = BashTool()
     ctx = ToolContext(workdir=tmp_path)
+    python_cmd = f'"{sys.executable}"'
 
     # 1) A command that spawns a child and outlives the timeout.
     timeout_result = await tool.run(
-        BashInput(command="python -c 'import time; time.sleep(5)'", timeout=0.3), ctx
+        BashInput(command=f"{python_cmd} {sleeper}", timeout=0.3), ctx
     )
     assert timeout_result.is_error is True
     assert timeout_result.metadata["timed_out"] is True
@@ -53,10 +60,14 @@ async def test_bash_tree_kill_actually_terminates(tmp_path):
     """The child must be GONE after the timeout — no zombie holding pipes."""
     import time
 
+    sleeper = tmp_path / "sleeper.py"
+    sleeper.write_text("import time; time.sleep(30)", encoding="utf-8")
     tool = BashTool()
     ctx = ToolContext(workdir=tmp_path)
     start = time.monotonic()
-    await tool.run(BashInput(command="python -c 'import time; time.sleep(30)'", timeout=0.3), ctx)
+    await tool.run(
+        BashInput(command=f'"{sys.executable}" {sleeper}', timeout=0.3), ctx
+    )
     elapsed = time.monotonic() - start
     # The bounded drain must not block: whole flow well under the sleep.
     assert elapsed < 10.0
