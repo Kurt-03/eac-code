@@ -41,7 +41,10 @@ def write_clipboard_text(text: str) -> bool:
         return _run(["wl-copy"], data)
     for tool in ("xclip", "xsel"):
         if shutil.which(tool):
-            args = ["xclip", "-selection", "clipboard"] if tool == "xclip" else ["xsel", "--clipboard", "--input"]
+            if tool == "xclip":
+                args = ["xclip", "-selection", "clipboard"]
+            else:
+                args = ["xsel", "--clipboard", "--input"]
             return _run(args, data)
     return False
 

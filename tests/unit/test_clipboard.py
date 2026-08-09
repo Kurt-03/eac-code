@@ -2,8 +2,6 @@
 
 import sys
 
-import pytest
-
 from eaccode.ui.clipboard import clipboard_available, write_clipboard_text
 
 
