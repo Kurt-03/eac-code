@@ -50,7 +50,10 @@ packages = ["src/eaccode"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not integration'"
+markers = [
+    "integration: live network calls — skipped by default (pytest -m integration)",
+]
 
 [tool.ruff]
 target-version = "py312"
