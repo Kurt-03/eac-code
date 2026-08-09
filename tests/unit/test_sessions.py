@@ -51,28 +51,6 @@ async def test_roundtrip_with_tool_calls(tmp_path):
 
 
 def test_save_autotitles_from_first_user_message(tmp_path):
-    from eaccode.llm.models import Message
-    from eaccode.sessions.store import SessionStore
-
-    store = SessionStore(tmp_path / "s.db")
-    sid = store.save_sync("untitled", [Message.user("Refactor the auth module")])
-    loaded = store.load_sync(sid)
-    assert "Refactor the auth module" in loaded.title
-
-
-def test_user_title_survives_resave(tmp_path):
-    from eaccode.llm.models import Message
-    from eaccode.sessions.store import SessionStore
-
-    store = SessionStore(tmp_path / "s.db")
-    sid = store.save_sync("My Custom Title", [Message.user("hi")])
-    # Resave with an auto-title attempt → user title must survive.
-    store.save_sync("untitled", [Message.user("different prompt")], session_id=sid)
-    loaded = store.load_sync(sid)
-    assert loaded.title == "My Custom Title"
-
-
-def test_save_autotitles_from_first_user_message(tmp_path):
     import asyncio
 
     from eaccode.llm.models import Message
