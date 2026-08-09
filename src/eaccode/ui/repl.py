@@ -89,6 +89,7 @@ class EaccodeApp(App):
         self._show_reasoning = False
         self._total_usage = TokenUsage()
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
+        self._spinner_interval = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -119,7 +120,9 @@ class EaccodeApp(App):
         except RuntimeError as e:
             self._no_providers = True
             self._error = str(e)
-            log.write(Panel.fit(f"[red]{e}[/red]", border_style="red"))
+            from eaccode.ui.messages import write_warn
+
+            log.write(write_warn(str(e)))
 
     async def _init_agent(self, build_agent_async, paths_cls,
                           connect_mcp_tools, log) -> None:
@@ -135,9 +138,13 @@ class EaccodeApp(App):
         except Exception as e:
             self._no_providers = True
             self._error = str(e)
-            log.write(Panel.fit(f"[red]{e}[/red]", border_style="red"))
+            from eaccode.ui.messages import write_warn
+
+            log.write(write_warn(str(e)))
             return
         self._agent = agent
+        # Phase B.1: wire the in-REPL permission modal into the loop.
+        agent.config.ask_async = self._ask_permission_async
         self.memory_facts = sysctx.memory_facts
         if mcp_tools:
             log.write(f"[dim]mcp: {len(mcp_tools)} external tool(s) loaded[/dim]")
@@ -166,7 +173,9 @@ class EaccodeApp(App):
             return
 
         if self._no_providers:
-            log.write(f"[red]{self._error}[/red]")
+            from eaccode.ui.messages import write_warn
+
+            log.write(write_warn(self._error))
             return
 
         self.messages.append({"role": "user", "content": text})
@@ -180,11 +189,24 @@ class EaccodeApp(App):
         except asyncio.CancelledError:
             log.write("[yellow]⏹ run cancelled[/yellow]")
         except Exception as e:
-            log.write(Panel.fit(f"[red]Error: {e}[/red]", border_style="red"))
+            from eaccode.ui.messages import write_error
+
+            log.write(write_error(f"Agent loop crashed: {e}"))
         finally:
             self._busy = False
             self._current_task = None
             self.query_one("#stream", Static).update("")
+
+    def _ask_permission_async(self, tool_name: str, arguments: dict, question: str) -> object:
+        """Push the permission modal; return a Future the loop awaits (B.1)."""
+        import asyncio
+
+        from eaccode.ui.permission_modal import PermissionModal
+
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        modal = PermissionModal(tool_name, arguments, question, resolve=future.set_result)
+        self.push_screen(modal)
+        return future
 
     async def _run_agent_streaming(self, log: RichLog) -> None:
         """Run the loop with live streaming: text deltas + tool cards."""
@@ -199,16 +221,43 @@ class EaccodeApp(App):
 
         stream_box = self.query_one("#stream", Static)
         stream_box.styles.display = "block"
-        stream_box.update("[dim]… working[/dim]")
         self._stream_text = ""
+        self._reasoning_text = ""
         self._tool_starts: dict[str, float] = {}
+        # B.4: animated spinner while the agent works (Braille cycle).
+        self._spinner_idx = 0
+        self._spinner_interval = self.set_interval(0.125, self._tick_spinner)
+        stream_box.update(self._spinner_frame())
         from eaccode.ui.preview import CHEVRON, VerboseLevel, build_call_card
 
+        def _hide_spinner() -> None:
+            if self._spinner_interval is not None:
+                self._spinner_interval.stop()
+                self._spinner_interval = None
+
         def on_text(delta: str) -> None:
+            _hide_spinner()
             self._stream_text += delta
             stream_box.update(f"[dim]{self._stream_text}[/dim]")
 
+        def on_reasoning_delta(delta: str) -> None:
+            """Accumulate reasoning; render collapsed above the answer (B.3).
+
+            MiniMax-M3 spends 1k-3k tokens thinking on hard prompts — the
+            display is capped at 2 KB by default and only expands with
+            `/reasoning on` (or `show-full`).
+            """
+            self._reasoning_text += delta
+            if not self._show_reasoning:
+                return  # collapsed: don't paint, just accumulate
+            capped = self._reasoning_text[:2000]
+            suffix = "…" if len(self._reasoning_text) > 2000 else ""
+            stream_box.update(
+                f"[dim italic]{capped}{suffix}[/dim italic]\n[dim]{self._stream_text}[/dim]"
+            )
+
         def on_tool_call(tc: ToolCall) -> None:
+            _hide_spinner()
             stream_box.update("")
             self._stream_text = ""
             import time
@@ -241,10 +290,20 @@ class EaccodeApp(App):
             duration_txt = f" · {duration:.1f}s" if duration is not None else ""
             preview_txt = f" {card.result_preview}" if card.result_preview else ""
             log.write(f"  [{style}]{mark}[/{style}] {card.name}{duration_txt}{preview_txt}")
+            # Phase B.7: multi-line result preview with collapse.
+            if card.result_lines and self.verbose_level in (
+                VerboseLevel.ALL, VerboseLevel.VERBOSE,
+            ):
+                for line in card.result_lines:
+                    log.write(f"    [dim]{line}[/dim]")
+                if card.collapsed:
+                    log.write(f"    [dim]… ({card.more_lines} more lines — "
+                              f"/verbose verbose to expand)[/dim]")
 
         result = await self._agent.run_streaming(
             history,
             on_text_delta=on_text,
+            on_reasoning_delta=on_reasoning_delta,
             on_tool_call=on_tool_call,
             on_tool_result=on_tool_result,
         )
@@ -252,13 +311,43 @@ class EaccodeApp(App):
         self._last_answer = result.final_text
         log.write(f"[cyan]eaccode[/cyan]\n{result.final_text}")
         self.messages.append({"role": "assistant", "content": result.final_text})
-        # Status bar (Phase B.2): model · mode · tokens · cost
+        # Status bar (Phase B.2): model · mode · tokens · cost · ctx%
         self._total_usage += result.usage
+        ctx_pct = self._context_pct()
+        ctx_txt = f" · {ctx_pct}%" if ctx_pct is not None else ""
         self.sub_title = (
             f"{self._model_name or '?'} · {self._mode_name or self._agent.policy.mode.value} · "
             f"{self._total_usage.input_tokens + self._total_usage.output_tokens} tok · "
-            f"${self._total_usage.cost_usd:.4f}"
+            f"${self._total_usage.cost_usd:.4f}{ctx_txt}"
         )
+
+    def _context_pct(self) -> int | None:
+        """Context-window usage % for the status bar (Phase B.5)."""
+        from eaccode.llm.tokens import count_message_tokens, model_context_window
+
+        if not self.messages:
+            return None
+        model = self._model_name or "default"
+        try:
+            window = model_context_window(model)
+            used = count_message_tokens(self.messages, model)
+        except Exception:
+            return None
+        return min(100, max(1, round(used * 100 / window)))
+
+    def _spinner_frame(self) -> str:
+        """Next Braille spinner frame (Phase B.4)."""
+        frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        frame = frames[self._spinner_idx % len(frames)]
+        self._spinner_idx += 1
+        return f"[dim]{frame} working…[/dim]"
+
+    def _tick_spinner(self) -> None:
+        """Textual interval callback: repaint the spinner frame."""
+        if self._busy:
+            stream = self.query_one("#stream", Static)
+            if stream.styles.display != "none":
+                stream.update(self._spinner_frame())
 
     def action_open_palette(self) -> None:
         """Ctrl+K: open the filterable command palette (Phase F.3)."""
@@ -335,7 +424,9 @@ class EaccodeApp(App):
             except asyncio.CancelledError:
                 log.write("[yellow]⏹ run cancelled[/yellow]")
             except Exception as e:
-                log.write(Panel.fit(f"[red]Error: {e}[/red]", border_style="red"))
+                from eaccode.ui.messages import write_error
+
+                log.write(write_error(f"Agent loop crashed: {e}"))
             finally:
                 self._busy = False
                 self._current_task = None

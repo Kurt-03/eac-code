@@ -44,4 +44,8 @@ def model_context_window(model: str) -> int:
         return 16_000
     if "gemini" in model:
         return 1_000_000
+    if "minimax" in model.lower():
+        return 200_000  # MiniMax-M3 advertises a 200k window
+    if "deepseek" in model.lower():
+        return 128_000
     return 128_000  # safe default

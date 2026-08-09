@@ -103,6 +103,10 @@ class ToolCallCard:
     duration_s: float | None = None
     ok: bool | None = None
     result_preview: str | None = None
+    # Phase B.7: multi-line result preview with collapse.
+    result_lines: list[str] | None = None
+    collapsed: bool = False
+    more_lines: int = 0
 
 
 def _quote(value) -> str:
@@ -116,6 +120,20 @@ def _quote(value) -> str:
     return str(value)
 
 
+def _preview_lines(result: str | None, max_lines: int) -> tuple[list[str] | None, bool, int]:
+    """Split a result into up to *max_lines* preview lines (Phase B.7).
+
+    Returns (lines, collapsed, more_lines): when the result has more than
+    max_lines, the preview is collapsed with a ``… (N more lines)`` tail.
+    """
+    if not result:
+        return None, False, 0
+    lines = result.splitlines()
+    if len(lines) <= max_lines:
+        return lines, False, 0
+    return lines[:max_lines], True, len(lines) - max_lines
+
+
 def build_call_card(
     tool_name: str,
     args: dict,
@@ -124,12 +142,14 @@ def build_call_card(
     duration_s: float | None = None,
     result_max: int = 100,
     full_args: bool = False,
+    result_lines_max: int = 4,
 ) -> ToolCallCard:
     """Assemble the render data for one tool call.
 
     The call expression shows the primary argument by default
     (``read(path="src/main.py")``); with *full_args* every argument is
-    included. bash commands are summarized for display.
+    included. bash commands are summarized for display. The result
+    preview is multi-line with collapse (Phase B.7).
     """
     key = _PRIMARY_ARGS.get(tool_name)
     if tool_name == "bash" and args.get("command"):
@@ -141,12 +161,16 @@ def build_call_card(
         rendered = f'{tool_name}({key}={_quote(args[key])})'
     else:
         rendered = tool_name
+    lines, collapsed, more = _preview_lines(result, result_lines_max)
     return ToolCallCard(
         name=tool_name,
         call=rendered,
         duration_s=duration_s,
         ok=(not is_error) if result is not None else None,
         result_preview=_truncate(_oneline(result), result_max) if result else None,
+        result_lines=lines,
+        collapsed=collapsed,
+        more_lines=more,
     )
 
 

@@ -67,3 +67,23 @@ def test_verbose_cycle():
     assert VerboseLevel.show_result("new", is_error=False) is True  # compact ✓
     assert VerboseLevel.show_full_args("new") is False
     assert VerboseLevel.show_full_args("all") is True
+
+
+def test_build_call_card_multiline_result_collapses():
+    from eaccode.ui.preview import build_call_card
+
+    long_result = "\n".join(f"line {i}" for i in range(10))
+    card = build_call_card("bash", {"command": "pytest"}, result=long_result)
+    assert card.collapsed is True
+    assert card.more_lines == 6  # 10 lines - 4 preview lines
+    assert card.result_lines is not None
+    assert len(card.result_lines) == 4
+
+
+def test_build_call_card_short_result_not_collapsed():
+    from eaccode.ui.preview import build_call_card
+
+    card = build_call_card("read", {"path": "x.py"}, result="1 line")
+    assert card.collapsed is False
+    assert card.more_lines == 0
+    assert card.result_lines == ["1 line"]

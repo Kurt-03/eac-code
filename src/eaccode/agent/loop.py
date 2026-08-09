@@ -39,6 +39,10 @@ class AgentConfig:
     on_tool_result: Callable[[ToolCall, object], None] | None = None
     on_text_delta: Callable[[str], None] | None = None
     on_reasoning_delta: Callable[[str], None] | None = None
+    # Phase B.1: async permission ask —
+    # callable(tool_name, arguments, question) -> Future[PermissionChoice].
+    # When None, the sync click.confirm path (or headless deny) is used.
+    ask_async: Callable[[str, dict, str], object] | None = None
 
 
 @dataclass
@@ -213,9 +217,19 @@ class AgentLoop:
                 content=f"Permission denied: {decision.reason}", is_error=True
             )
         if decision.action.value == "ask":
-            granted = prompt_for_permission(
-                tc.name, tc.arguments, session_rules=self.session_rules
-            )
+            if self.config.ask_async is not None:
+                # Phase B.1: in-REPL modal path (loop-safe Future await).
+                from eaccode.permissions.prompts import prompt_for_permission_async
+
+                granted = await prompt_for_permission_async(
+                    tc.name, tc.arguments,
+                    session_rules=self.session_rules,
+                    ask_async=lambda q: self.config.ask_async(tc.name, tc.arguments, q),  # type: ignore[misc]
+                )
+            else:
+                granted = prompt_for_permission(
+                    tc.name, tc.arguments, session_rules=self.session_rules
+                )
             if not granted:
                 from eaccode.tools.base import ToolResult
 
