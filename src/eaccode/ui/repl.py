@@ -224,6 +224,11 @@ class EaccodeApp(App):
         self._stream_text = ""
         self._reasoning_text = ""
         self._tool_starts: dict[str, float] = {}
+        # C.4: single-writer fence — a new turn supersedes this stream.
+        from eaccode.llm.stream_fence import claim_stream_writer, fence_delta
+
+        self._stream_writer_token = claim_stream_writer(self)
+        writer_token = self._stream_writer_token
         # B.4: animated spinner while the agent works (Braille cycle).
         self._spinner_idx = 0
         self._spinner_interval = self.set_interval(0.125, self._tick_spinner)
@@ -236,6 +241,8 @@ class EaccodeApp(App):
                 self._spinner_interval = None
 
         def on_text(delta: str) -> None:
+            if fence_delta(self, writer_token, delta) is None:
+                return  # stale stream — a newer turn owns the UI
             _hide_spinner()
             self._stream_text += delta
             stream_box.update(f"[dim]{self._stream_text}[/dim]")
@@ -247,6 +254,8 @@ class EaccodeApp(App):
             display is capped at 2 KB by default and only expands with
             `/reasoning on` (or `show-full`).
             """
+            if fence_delta(self, writer_token, delta) is None:
+                return  # stale stream
             self._reasoning_text += delta
             if not self._show_reasoning:
                 return  # collapsed: don't paint, just accumulate

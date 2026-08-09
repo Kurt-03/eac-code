@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class WriteInput(BaseModel):
@@ -17,7 +17,8 @@ class WriteTool(Tool):
     name = "write"
     description = "Create or overwrite a file with the given content."
     input_model = WriteInput
-    requires_permission = True  # confirmation in default mode
+    requires_permission = True
+    tool_class = ToolClass.MUTATING  # confirmation in default mode
 
     async def run(self, input: WriteInput, ctx: ToolContext) -> ToolResult:
         path = Path(input.path)

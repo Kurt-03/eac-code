@@ -22,7 +22,7 @@ from eaccode._subprocess_compat import (
     kill_process_tree,
     windows_hide_flags,
 )
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 MAX_TIMEOUT = 300.0
 
@@ -40,6 +40,7 @@ class ExecuteCodeTool(Tool):
     )
     input_model = ExecuteCodeInput
     requires_permission = True
+    tool_class = ToolClass.MUTATING
 
     async def run(self, input: ExecuteCodeInput, ctx: ToolContext) -> ToolResult:
         timeout = min(input.timeout, MAX_TIMEOUT)

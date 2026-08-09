@@ -1,6 +1,8 @@
 """Tool protocol and registry (Task 3.1)."""
+
 from __future__ import annotations
 
+import enum
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
@@ -8,6 +10,25 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, Field
 
 from eaccode.tools.schema import to_json_schema
+
+
+class ToolClass(str, enum.Enum):  # noqa: UP042  (str values for config/schema)
+    """Tool classification for the loop guardrails (Phase C.1).
+
+    Mirrors Hermes' ``agent/tool_guardrails.py`` taxonomy:
+    - IDEMPOTENT: read-style, safe to repeat (read, glob, grep, web_fetch,
+      session_search). Repeating the same call with the same result is a
+      no-progress signal.
+    - MUTATING: write-style, changes state (write, edit, bash, todo,
+      skill_create, delegate_task). Repeated identical failures are the
+      loop signal.
+    - RUNAWAY: per-turn caps apply (web_search, delegate_task) — a single
+      turn spiraling into dozens of searches/subagents is pathological.
+    """
+
+    IDEMPOTENT = "idempotent"
+    MUTATING = "mutating"
+    RUNAWAY = "runaway"
 
 
 class ToolContext(BaseModel):
@@ -29,6 +50,9 @@ class Tool(ABC):
     description: ClassVar[str]
     input_model: ClassVar[type[BaseModel]]
     requires_permission: ClassVar[bool] = True
+    # Phase C.1: loop-guardrail classification (default: mutating — the
+    # safe assumption; read-style tools override to idempotent).
+    tool_class: ClassVar[ToolClass] = ToolClass.MUTATING
 
     @abstractmethod
     async def run(self, input: BaseModel, ctx: ToolContext) -> ToolResult: ...

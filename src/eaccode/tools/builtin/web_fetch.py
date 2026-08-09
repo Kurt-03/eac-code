@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 import httpx
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class WebFetchInput(BaseModel):
@@ -47,6 +47,7 @@ class _TextExtractor(HTMLParser):
 
 class WebFetchTool(Tool):
     name = "web_fetch"
+    tool_class = ToolClass.IDEMPOTENT
     description = "Fetch a URL and return its readable text content."
     input_model = WebFetchInput
     requires_permission = False

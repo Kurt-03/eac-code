@@ -32,7 +32,7 @@ from eaccode._subprocess_compat import (
     noninteractive_git_env,
     windows_hide_flags,
 )
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class BashInput(BaseModel):
@@ -52,7 +52,8 @@ class BashTool(Tool):
         "Set timeout in seconds (default 30, max 600)."
     )
     input_model = BashInput
-    requires_permission = True  # always gated by the policy engine
+    requires_permission = True
+    tool_class = ToolClass.MUTATING  # always gated by the policy engine
 
     async def run(self, input: BashInput, ctx: ToolContext) -> ToolResult:
         timeout = min(input.timeout, 600.0)

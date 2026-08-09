@@ -10,7 +10,7 @@ import os
 import httpx
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class WebSearchInput(BaseModel):
@@ -20,6 +20,7 @@ class WebSearchInput(BaseModel):
 
 class WebSearchTool(Tool):
     name = "web_search"
+    tool_class = ToolClass.RUNAWAY
     description = "Search the web. Returns titles, URLs, and snippets."
     input_model = WebSearchInput
     requires_permission = False

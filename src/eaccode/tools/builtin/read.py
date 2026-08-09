@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class ReadInput(BaseModel):
@@ -20,6 +20,7 @@ class ReadInput(BaseModel):
 
 class ReadTool(Tool):
     name = "read"
+    tool_class = ToolClass.IDEMPOTENT
     description = (
         "Read a file's contents. Supports offset/limit for large files. "
         "Returns lines with line numbers."

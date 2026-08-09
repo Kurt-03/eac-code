@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class EditInput(BaseModel):
@@ -24,6 +24,7 @@ class EditTool(Tool):
     )
     input_model = EditInput
     requires_permission = True
+    tool_class = ToolClass.MUTATING
 
     async def run(self, input: EditInput, ctx: ToolContext) -> ToolResult:
         from eaccode.tools.safety import write_denied_error

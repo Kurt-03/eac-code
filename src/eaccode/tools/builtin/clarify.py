@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class ClarifyInput(BaseModel):
@@ -17,6 +17,7 @@ class ClarifyInput(BaseModel):
 
 class ClarifyTool(Tool):
     name = "clarify"
+    tool_class = ToolClass.IDEMPOTENT
     description = (
         "Ask the user a clarifying question when the task is ambiguous. "
         "Call this instead of guessing when requirements are unclear."

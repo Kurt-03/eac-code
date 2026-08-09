@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class GlobInput(BaseModel):
@@ -17,6 +17,7 @@ class GlobInput(BaseModel):
 
 class GlobTool(Tool):
     name = "glob"
+    tool_class = ToolClass.IDEMPOTENT
     description = "Find files matching a glob pattern. Returns matching paths."
     input_model = GlobInput
     requires_permission = False

@@ -10,7 +10,7 @@ import asyncio
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 _semaphore = asyncio.Semaphore(3)
 
@@ -29,6 +29,7 @@ class DelegateTool(Tool):
     )
     input_model = DelegateInput
     requires_permission = True
+    tool_class = ToolClass.RUNAWAY
 
     async def run(self, input: DelegateInput, ctx: ToolContext) -> ToolResult:
         builder = (ctx.config or {}).get("delegate_builder") or getattr(

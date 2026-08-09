@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class GrepInput(BaseModel):
@@ -20,6 +20,7 @@ class GrepInput(BaseModel):
 
 class GrepTool(Tool):
     name = "grep"
+    tool_class = ToolClass.IDEMPOTENT
     description = (
         "Search files for a regex pattern. Returns file:line:content matches "
         "with optional context lines. Uses ripgrep when available."

@@ -67,6 +67,10 @@ class AgentLoop:
         self.policy = policy
         self.config = config
         self.session_rules: list[Rule] = []  # "always allow" patterns from prompts
+        # Phase C.2/C.3: loop guardrails (reset per run).
+        from eaccode.agent.guardrails import ToolCallGuardrailController
+
+        self.guardrails = ToolCallGuardrailController()
 
     async def run(self, messages: list[Message]) -> AgentResult:
         tool_schemas = self.executor.registry.schemas()
@@ -76,6 +80,8 @@ class AgentLoop:
             skills_dir=self.config.skills_dir or Path(),
         )
         total_usage = TokenUsage()
+
+        self.guardrails.reset_for_turn()
 
         for turn in range(self.config.max_turns):
             req = CompletionRequest(
@@ -113,7 +119,7 @@ class AgentLoop:
             for tc in resp.tool_calls:
                 if self.config.on_tool_call:
                     self.config.on_tool_call(tc)
-                result = await self._execute_with_permission(tc, ctx)
+                result = await self._execute_guarded(tc, ctx)
                 messages.append(
                     Message.tool_result(
                         tc.id, result.content, is_error=result.is_error, name=tc.name
@@ -195,7 +201,7 @@ class AgentLoop:
             for tc in tool_calls:
                 if on_tool_call:
                     on_tool_call(tc)
-                result = await self._execute_with_permission(tc, ctx)
+                result = await self._execute_guarded(tc, ctx)
                 messages.append(
                     Message.tool_result(
                         tc.id, result.content, is_error=result.is_error, name=tc.name
@@ -207,6 +213,34 @@ class AgentLoop:
         raise MaxTurnsExceededError(
             f"Reached max_turns={self.config.max_turns} without a final answer"
         )
+
+    async def _execute_guarded(self, tc: ToolCall, ctx: ToolContext):
+        """Guardrails → permission → execute (Phase C.3).
+
+        Guardrail warnings surface through ``on_tool_result`` as extra
+        context (the LLM sees them and can change strategy); blocks
+        short-circuit with a synthetic error result.
+        """
+        from eaccode.tools.base import ToolResult
+
+        # Phase C.3: loop guardrails — before the call.
+        guard = self.guardrails.before_call(tc.name, tc.arguments, registry=self.executor.registry)
+        if guard.action == "block":
+            return ToolResult(content=guard.message, is_error=True, metadata={"guardrail": guard.code})
+
+        result = await self._execute_with_permission(tc, ctx)
+
+        # Phase C.3: loop guardrails — after the call (warn on loops).
+        after = self.guardrails.after_call(
+            tc.name, tc.arguments, result.content,
+            failed=result.is_error,
+            registry=self.executor.registry,
+        )
+        if after.action == "warn" and after.message:
+            # Append the warning to the tool result so the LLM sees it
+            # and can change strategy (Hermes' warning-guidance pattern).
+            result.content = f"{result.content}\n\n[guardrail] {after.message}"
+        return result
 
     async def _execute_with_permission(self, tc: ToolCall, ctx: ToolContext):
         decision = self.policy.decide(tc.name, tc.arguments)

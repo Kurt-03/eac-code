@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 
 class TodoItem(BaseModel):
@@ -22,6 +22,7 @@ class TodoWriteInput(BaseModel):
 
 class TodoWriteTool(Tool):
     name = "todo_write"
+    tool_class = ToolClass.IDEMPOTENT
     description = (
         "Track progress on a multi-step task. Always maintain the full list "
         "of remaining work in every call."
