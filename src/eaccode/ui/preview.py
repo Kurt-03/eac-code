@@ -200,3 +200,54 @@ class VerboseLevel:
     @classmethod
     def show_full_args(cls, level: str) -> bool:
         return level in (cls.ALL, cls.VERBOSE)
+
+
+# ---------------------------------------------------------------------------
+# Friendly tool labels (Phase H.6) — human-phrased verbs for built-in tools.
+# Ported from Hermes' display.py _TOOL_VERBS: turns the status line into
+# "Running pytest…" instead of "⎿ bash(command=\"pytest\")".
+# ---------------------------------------------------------------------------
+
+_TOOL_VERBS: dict[str, str] = {
+    "web_search": "Searching the web",
+    "web_fetch": "Fetching",
+    "read": "Reading",
+    "write": "Writing",
+    "edit": "Editing",
+    "bash": "Running",
+    "execute_code": "Running code",
+    "glob": "Listing files",
+    "grep": "Searching files",
+    "todo_write": "Updating tasks",
+    "clarify": "Asking",
+    "delegate_task": "Delegating",
+    "session_search": "Searching past sessions",
+}
+
+# Verbs that read better without the raw argument preview appended.
+_TOOL_VERBS_NO_PREVIEW: frozenset[str] = frozenset({
+    "todo_write", "session_search", "clarify",
+})
+
+# Verbs that take a "for" connector before the preview (search-style phrasing).
+_TOOL_VERBS_FOR_CONNECTOR: frozenset[str] = frozenset({
+    "web_search", "grep",
+})
+
+
+def build_tool_label(tool_name: str, args: dict, max_len: int | None = None) -> str | None:
+    """Human-phrased status label: "Reading src/main.py" (Phase H.6).
+
+    Falls back to the raw tool preview for unknown/plugin tools.
+    """
+    verb = _TOOL_VERBS.get(tool_name)
+    if verb is None:
+        return build_tool_preview(tool_name, args, max_len=max_len)
+    if tool_name in _TOOL_VERBS_NO_PREVIEW:
+        return verb
+    preview = build_tool_preview(tool_name, args, max_len=max_len)
+    if not preview:
+        return verb
+    if tool_name in _TOOL_VERBS_FOR_CONNECTOR:
+        return f"{verb} for {preview}"
+    return f"{verb} {preview}"

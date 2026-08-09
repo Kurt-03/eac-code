@@ -73,6 +73,9 @@ class AgentLoop:
         self.guardrails = ToolCallGuardrailController()
 
     async def run(self, messages: list[Message]) -> AgentResult:
+        # Phase H.3: expand @-references in the LAST user message before
+        # the LLM sees it (earlier turns were already expanded).
+        messages = self._expand_user_references(messages)
         tool_schemas = self.executor.registry.schemas()
         ctx = ToolContext(
             workdir=self.config.workdir,
@@ -148,6 +151,8 @@ class AgentLoop:
         results returned to the LLM. Streams do not report usage — the
         result usage stays zero for streaming turns.
         """
+        # Phase H.3: expand @-references in the last user message.
+        messages = self._expand_user_references(messages)
         tool_schemas = self.executor.registry.schemas()
         ctx = ToolContext(
             workdir=self.config.workdir,
@@ -213,6 +218,28 @@ class AgentLoop:
         raise MaxTurnsExceededError(
             f"Reached max_turns={self.config.max_turns} without a final answer"
         )
+
+    def _expand_user_references(self, messages: list[Message]) -> list[Message]:
+        """Phase H.3: expand @-references in the last user message."""
+        if not messages or messages[-1].role.value != "user":
+            return messages
+        last = messages[-1]
+        text = "".join(b.text for b in last.content if b.type == "text")
+        if "@" not in text:
+            return messages
+        from eaccode.ui.context_refs import preprocess_context_references
+
+        expanded = preprocess_context_references(text, cwd=self.config.workdir)
+        if expanded == text:
+            return messages
+        # Rebuild the message with the expanded text (keep other blocks).
+        from eaccode.llm.models import Message, TextContent
+
+        new_content = [
+            TextContent(text=expanded) if b.type == "text" else b
+            for b in last.content
+        ]
+        return [*messages[:-1], Message(role=last.role, content=new_content)]
 
     async def _execute_guarded(self, tc: ToolCall, ctx: ToolContext):
         """Guardrails → permission → execute (Phase C.3).

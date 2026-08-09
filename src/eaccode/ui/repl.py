@@ -233,7 +233,12 @@ class EaccodeApp(App):
         self._spinner_idx = 0
         self._spinner_interval = self.set_interval(0.125, self._tick_spinner)
         stream_box.update(self._spinner_frame())
-        from eaccode.ui.preview import CHEVRON, VerboseLevel, build_call_card
+        from eaccode.ui.preview import (
+            CHEVRON,
+            VerboseLevel,
+            build_call_card,
+            build_tool_label,
+        )
 
         def _hide_spinner() -> None:
             if self._spinner_interval is not None:
@@ -273,11 +278,17 @@ class EaccodeApp(App):
 
             self._tool_starts[tc.id] = time.monotonic()
             if VerboseLevel.show_start(self.verbose_level):
-                card = build_call_card(
-                    tc.name, tc.arguments,
-                    full_args=VerboseLevel.show_full_args(self.verbose_level),
-                )
-                log.write(f"[dim]{CHEVRON} {card.call}[/dim]")
+                # Phase H.6: friendly verb label ("Running pytest…") instead
+                # of the raw call expression when a verb is known.
+                label = build_tool_label(tc.name, tc.arguments)
+                if label:
+                    log.write(f"[dim]{CHEVRON} {label}[/dim]")
+                else:
+                    card = build_call_card(
+                        tc.name, tc.arguments,
+                        full_args=VerboseLevel.show_full_args(self.verbose_level),
+                    )
+                    log.write(f"[dim]{CHEVRON} {card.call}[/dim]")
 
         def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
             import time

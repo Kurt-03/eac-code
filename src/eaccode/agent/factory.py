@@ -73,8 +73,14 @@ async def build_system_context_async(
     skills = ""
     if skills_dirs and not ignore_rules:
         skills = skills_to_system_prompt_section(discover_skills(skills_dirs))
+    # Phase H.2: workspace snapshot (git state + verify commands) —
+    # computed per session so the cache key reflects the repo state.
+    from eaccode.agent.workspace import build_coding_workspace_block
+
+    workspace_block = "" if ignore_rules else build_coding_workspace_block(workdir)
     key = (
         str(workdir), project_rules, tuple(memory_facts), skills, ignore_rules,
+        workspace_block,
     )
     cached = _prompt_cache.get(key)
     if cached is not None:
@@ -84,6 +90,7 @@ async def build_system_context_async(
         memory_facts=memory_facts,
         skills=skills,
         workdir=str(workdir),
+        workspace_block=workspace_block,
     )
     ctx = SystemContext(system_prompt=prompt, memory_facts=memory_facts)
     if len(_prompt_cache) >= _PROMPT_CACHE_MAX:

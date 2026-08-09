@@ -87,3 +87,27 @@ def test_build_call_card_short_result_not_collapsed():
     assert card.collapsed is False
     assert card.more_lines == 0
     assert card.result_lines == ["1 line"]
+
+
+def test_friendly_tool_label_reading():
+    from eaccode.ui.preview import build_tool_label
+
+    assert build_tool_label("read", {"path": "src/main.py"}) == "Reading src/main.py"
+
+
+def test_friendly_tool_label_bash_summarized():
+    from eaccode.ui.preview import build_tool_label
+
+    assert build_tool_label("bash", {"command": "pytest"}) == "Running pytest"
+
+
+def test_friendly_tool_label_for_connector():
+    from eaccode.ui.preview import build_tool_label
+
+    assert build_tool_label("web_search", {"query": "python"}) == "Searching the web for python"
+
+
+def test_unknown_tool_falls_back_to_raw_preview():
+    from eaccode.ui.preview import build_tool_label
+
+    assert build_tool_label("mcp_custom", {"x": "1"}) == "1"

@@ -71,6 +71,12 @@ class _StreamMixin:
             # `eaccode.llm.client.completion` and the client picks it up
             # at construction time (back-compat with pre-split tests).
             completion_fn = self.completion_fn
+            # Phase H.1: stateful think-scrubber — MiniMax streams
+            # <think> blocks split across deltas; a per-delta regex would
+            # leak them to the user.
+            from eaccode.llm.think_scrubber import StreamingThinkScrubber
+
+            scrubber = StreamingThinkScrubber()
             try:
                 response = completion_fn(**kwargs)  # stream=True via req.stream
             except Exception as e:  # deliver errors to the consumer
@@ -95,7 +101,9 @@ class _StreamMixin:
                     _put(ReasoningDelta(reasoning))
                 content = _field(delta, "content")
                 if content:
-                    _put(content)
+                    scrubbed = scrubber.feed(content)
+                    if scrubbed:
+                        _put(scrubbed)
                 for tc in _field(delta, "tool_calls") or []:
                     buf = tool_buf.setdefault(
                         _field(tc, "index") or 0,

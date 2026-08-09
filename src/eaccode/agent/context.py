@@ -23,6 +23,7 @@ def build_system_prompt(
     skills: str,
     workdir: str,
     tool_list: str = "",
+    workspace_block: str = "",
 ) -> str:
     parts = [
         "You are eaccode, an autonomous coding agent. You can read and write files, "
@@ -30,6 +31,9 @@ def build_system_prompt(
         "Ask for permission when required by the permission mode.",
         f"\n# Working directory\n{workdir}",
     ]
+    # Phase H.2: git state + verify commands snapshot (empty outside a repo).
+    if workspace_block:
+        parts.append(f"\n{workspace_block}")
     if project_rules:
         parts.append(f"\n# Project rules (from project context file)\n{project_rules}")
     if memory_facts:

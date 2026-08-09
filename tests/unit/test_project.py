@@ -17,8 +17,22 @@ def test_first_match_wins(tmp_path):
     (tmp_path / "AGENTS.md").write_text("AGENTS rules")
     (tmp_path / "EACCODE.md").write_text("EACCODE rules")
     ctx = discover_project_context(tmp_path)
+    # Both are loaded now (Phase H.9): EACCODE.md is project identity,
+    # AGENTS.md is layered rules — Hermes loads the full chain.
     assert "EACCODE rules" in ctx
-    assert "AGENTS rules" not in ctx
+    assert "AGENTS rules" in ctx
+
+
+def test_agents_md_parent_chain_layers(tmp_path):
+    """AGENTS.md in cwd AND git root are both loaded (nearest first)."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "AGENTS.md").write_text("ROOT AGENTS rules")
+    sub = tmp_path / "src"
+    sub.mkdir()
+    (sub / "AGENTS.md").write_text("SUB AGENTS rules")
+    ctx = discover_project_context(sub)
+    assert "SUB AGENTS rules" in ctx
+    assert "ROOT AGENTS rules" in ctx
 
 
 def test_no_context_file(tmp_path):

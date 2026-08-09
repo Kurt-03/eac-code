@@ -89,7 +89,9 @@ async def test_repl_streaming_callbacks(repl_app, tmp_path):
         inp.value = "read the file"
         await pilot.press("enter")
         lines = [_strip_text(line) for line in app.query_one(RichLog).lines]
-        assert any("⎿ read(path=" in line for line in lines)  # tool call line
+        # Phase H.6: friendly verb label — "⎿ Reading x.py" (fallback to the
+        # raw expression only for unknown tools).
+        assert any("⎿ Reading x.py" in line for line in lines)  # tool call line
         assert any("✓ read" in line for line in lines)  # tool result
         assert any("Hello world" in line for line in lines)  # final answer
 
