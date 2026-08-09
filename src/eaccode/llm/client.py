@@ -1,14 +1,19 @@
-"""LiteLLM client (Task 2.2).
+"""LiteLLM client — orchestration shell.
 
 Unified interface: complete() (sync, with retry) and stream() (async).
+The heavy lifting lives in two mixins, extracted for maintainability:
+
+- ``_ResolveMixin`` (``llm/_resolve.py``): model resolution, message and
+  tool-schema conversion, per-request credential kwargs.
+- ``_StreamMixin`` (``llm/_stream.py``): thread-based streaming producer.
+
 Provider-specific details (prefix, keys, base URLs) come from providers.yaml.
 """
+
 from __future__ import annotations
 
-import asyncio
 import json
 import os
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,31 +22,22 @@ from litellm import completion
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from eaccode.config.providers import load_providers
+from eaccode.llm._resolve import _ResolveMixin
+from eaccode.llm._stream import ReasoningDelta, StreamUsage, _StreamMixin
 from eaccode.llm.errors import RetryPolicy, classify_api_error
 from eaccode.llm.model_switch import FallbackChain
 from eaccode.llm.models import Message, ToolCall
 
-
-def _is_transient(exc: Exception) -> bool:
-    """Only transient failures (429/5xx/timeout/unknown) are retried."""
-    return classify_api_error(exc).policy == RetryPolicy.RETRY
-
-
-class ReasoningDelta:
-    """reasoning_content from the stream (DeepSeek/Qwen/R1) —
-    delivered separately from the answer text."""
-
-    def __init__(self, text: str) -> None:
-        self.text = text
-
-
-class StreamUsage:
-    """Usage reported at the end of a stream (OpenAI-compatible)."""
-
-    def __init__(self, input_tokens: int = 0, output_tokens: int = 0, cost_usd: float = 0.0):
-        self.input_tokens = input_tokens
-        self.output_tokens = output_tokens
-        self.cost_usd = cost_usd
+# Re-exported for back-compat (existing `from eaccode.llm.client import X`
+# call sites must keep working after the split).
+__all__ = [
+    "CompletionRequest",
+    "CompletionResponse",
+    "LLMClient",
+    "ReasoningDelta",
+    "StreamUsage",
+    "TokenUsage",
+]
 
 
 @dataclass
@@ -85,7 +81,12 @@ _RETRYABLE = (
 )
 
 
-class LLMClient:
+def _is_transient(exc: Exception) -> bool:
+    """Only transient failures (429/5xx/timeout/unknown) are retried."""
+    return classify_api_error(exc).policy == RetryPolicy.RETRY
+
+
+class LLMClient(_ResolveMixin, _StreamMixin):
     def __init__(
         self,
         default_model: str,
@@ -104,120 +105,10 @@ class LLMClient:
                 os.environ.setdefault(k, v)
         litellm.telemetry = False
         litellm.drop_params = True  # silently ignore unknown params (e.g. thinking)
-
-    # ------------------------------------------------------------- Auflösung
-
-    def _resolve_model(
-        self, model: str | None, provider_name: str | None = None
-    ) -> str:
-        """Model name → LiteLLM ID (respecting the provider prefix)."""
-        model = model or self.default_model
-        provider_name = provider_name or self.provider_name
-        if "/" in model:
-            return model  # already qualified
-        if provider_name:
-            provider = self.providers.get(provider_name)
-            if provider:
-                return provider.litellm_model(model)
-            return f"{provider_name}/{model}"
-        return model
-
-    # ------------------------------------------------------- Konvertierung
-
-    def _to_litellm_messages(
-        self, messages: list[Message], system: str | None
-    ) -> list[dict]:
-        out: list[dict] = []
-        if system:
-            out.append({"role": "system", "content": system})
-        for m in messages:
-            if m.role.value == "system":
-                out.append({"role": "system", "content": m.content[0].text})
-            elif m.role.value == "tool":
-                out.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": m.tool_call_id,
-                        "content": m.content[0].text,
-                    }
-                )
-            elif m.tool_calls:
-                out.append(
-                    {
-                        "role": "assistant",
-                        "content": "".join(
-                            b.text for b in m.content if b.type == "text"
-                        ),
-                        "tool_calls": [
-                            {
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.name,
-                                    "arguments": json.dumps(tc.arguments),
-                                },
-                            }
-                            for tc in m.tool_calls
-                        ],
-                    }
-                )
-            else:
-                content: list[dict] = []
-                for b in m.content:
-                    if b.type == "text":
-                        content.append({"type": "text", "text": b.text})
-                    else:
-                        content.append(
-                            {"type": "image_url", "image_url": {"url": b.source.get("data", "")}}
-                        )
-                out.append({"role": m.role.value, "content": content})
-        return out
-
-    def _base_kwargs(
-        self,
-        req: CompletionRequest,
-        *,
-        provider_name: str | None = None,
-        model: str | None = None,
-    ) -> dict:
-        provider_name = provider_name or self.provider_name
-        kwargs = {
-            "model": self._resolve_model(model or req.model, provider_name),
-            "messages": self._to_litellm_messages(req.messages, req.system),
-            "max_tokens": req.max_tokens,
-            "stream": req.stream,
-        }
-        if req.tools:
-            kwargs["tools"] = self._to_litellm_tools(req.tools)
-        # Pass credentials explicitly: LiteLLM only knows OPENAI_API_KEY for
-        # `openai/`-prefixed custom endpoints, so per-request api_key/api_base
-        # is required for BYOK providers like opencode-go (Task 1.5 finding).
-        provider = self.providers.get(provider_name) if provider_name else None
-        if provider:
-            kwargs["api_key"] = provider.api_key.get_secret_value()
-            if provider.base_url:
-                kwargs["api_base"] = provider.base_url
-        return kwargs
-
-    @staticmethod
-    def _to_litellm_tools(schemas: list[dict]) -> list[dict]:
-        """Convert our Anthropic-style tool schemas to the OpenAI format.
-
-        LiteLLM converts OpenAI → Anthropic automatically, but NOT the other
-        way around — MiniMax rejected Anthropic-style tools with
-        'invalid tool type' (2013) (live finding).
-        """
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": t["name"],
-                    "description": t.get("description", ""),
-                    "parameters": t.get("input_schema", {"type": "object"}),
-                },
-            }
-            for t in schemas
-        ]
+        # DI seam for the streaming producer (see _stream.py:_produce).
+        # Kept as an instance attribute so tests can inject a fake without
+        # touching litellm's module globals.
+        self.completion_fn = completion
 
     # ------------------------------------------------------------- complete
 
@@ -294,98 +185,7 @@ class LLMClient:
             model=getattr(resp, "model", kwargs["model"]),
         )
 
-    # -------------------------------------------------------------- stream
 
-    async def stream(
-        self, req: CompletionRequest
-    ) -> AsyncIterator[str | ToolCall | ReasoningDelta]:
-        """Yields text deltas, reasoning deltas, and finally the tool calls.
-
-        litellm's streaming is synchronous — iterating its generator inside
-        the event loop would freeze the UI for seconds per chunk. The sync
-        iteration therefore runs in a worker thread; parsed chunks arrive
-        through an asyncio.Queue, so the UI stays live while tokens flow.
-        """
-        kwargs = self._base_kwargs(req)
-        if req.temperature is not None:
-            kwargs["temperature"] = req.temperature
-
-        queue: asyncio.Queue = asyncio.Queue(maxsize=64)
-        loop = asyncio.get_running_loop()
-
-        def _put(item) -> None:
-            # asyncio.Queue is not thread-safe: put_nowait from a worker
-            # thread would never wake the consumer. call_soon_threadsafe is
-            # the canonical way to hand items into the loop from a thread.
-            loop.call_soon_threadsafe(queue.put_nowait, item)
-
-        def _field(obj, name: str, default=None):
-            """Read a field from either a pydantic object or a plain dict.
-
-            litellm versions differ: ModelResponse.model_validate produces
-            dict deltas in some releases, pydantic objects in others.
-            """
-            if isinstance(obj, dict):
-                return obj.get(name, default)
-            return getattr(obj, name, default)
-
-        def _produce() -> None:
-            """Sync producer: call litellm, parse chunks, queue objects."""
-            try:
-                response = completion(**kwargs)  # stream=True via req.stream
-            except Exception as e:  # deliver errors to the consumer
-                _put(e)
-                return
-            tool_buf: dict[int, dict] = {}
-            usage = None
-            for chunk in response:
-                choices = _field(chunk, "choices") or []
-                if not choices:
-                    # final chunk carries usage (OpenAI-compatible streams)
-                    u = _field(chunk, "usage")
-                    if u and (_field(u, "prompt_tokens") or _field(u, "completion_tokens")):
-                        usage = StreamUsage(
-                            input_tokens=_field(u, "prompt_tokens") or 0,
-                            output_tokens=_field(u, "completion_tokens") or 0,
-                        )
-                    continue
-                delta = _field(choices[0], "delta") or {}
-                reasoning = _field(delta, "reasoning_content")
-                if reasoning:
-                    _put(ReasoningDelta(reasoning))
-                content = _field(delta, "content")
-                if content:
-                    _put(content)
-                for tc in _field(delta, "tool_calls") or []:
-                    buf = tool_buf.setdefault(
-                        _field(tc, "index") or 0,
-                        {
-                            "id": _field(tc, "id") or "",
-                            "name": _field(_field(tc, "function"), "name") or "",
-                            "args": "",
-                        },
-                    )
-                    args = _field(_field(tc, "function"), "arguments")
-                    if args:
-                        buf["args"] += args
-            for buf in tool_buf.values():
-                try:
-                    args = json.loads(buf["args"]) if buf["args"] else {}
-                except (json.JSONDecodeError, TypeError):
-                    args = {}
-                _put(ToolCall(id=buf["id"], name=buf["name"], arguments=args))
-            if usage:
-                _put(usage)
-            _put(None)
-
-        producer = asyncio.create_task(asyncio.to_thread(_produce))
-        try:
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                if isinstance(item, Exception):
-                    raise item
-                yield item
-        finally:
-            await producer
+# Back-compat aliases: the mixin classes are implementation details; the
+# public surface of this module stays identical to pre-split client.py.
+# (ReasoningDelta/StreamUsage/TokenUsage defined above; nothing else to alias.)
