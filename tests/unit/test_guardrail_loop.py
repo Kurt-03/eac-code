@@ -61,7 +61,9 @@ async def test_loop_guardrails_break_identical_failure_loop(tmp_path):
         exact_failure_warn_after=2,
         exact_failure_block_after=3,
     )
-    with pytest.raises(Exception):
+    from eaccode.agent.loop import MaxTurnsExceededError
+
+    with pytest.raises((MaxTurnsExceededError, RuntimeError)):
         await agent.run([Message.user("run it")])
     # Either the loop exhausted max_turns (all blocked) or guardrail halted.
     assert client.calls >= 3
