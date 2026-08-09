@@ -61,6 +61,8 @@ async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
     import json
     import subprocess
 
+    from eaccode._subprocess_compat import IS_WINDOWS, windows_hide_flags
+
     cmd = [
         "eaccode", "run", job.prompt,
         "--print", "--output-format", "json",
@@ -70,6 +72,12 @@ async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
         cmd += ["--allowed-tools", ",".join(job.tools)]
     # subprocess.run in a thread: asyncio subprocesses are unreliable on
     # Windows (errno 9 / NotImplementedError depending on the loop policy)
+    popen_kwargs: dict = {}
+    if IS_WINDOWS:
+        # CREATE_NO_WINDOW: queued jobs must never flash a console over
+        # the user's REPL, and must not inherit a console handle that can
+        # EBADF the captured pipes (errno 9 class, Phase A.4).
+        popen_kwargs["creationflags"] = windows_hide_flags()
     proc = await asyncio.to_thread(
         subprocess.run,
         cmd,
@@ -78,6 +86,7 @@ async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=3600,
+        **popen_kwargs,
     )
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or b"").decode()[:500])

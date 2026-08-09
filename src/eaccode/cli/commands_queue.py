@@ -123,19 +123,15 @@ def review_cmd(diff_ref: str, aspects: str | None, detach: bool) -> None:
     Watch progress with `eaccode queue status`; append more with --detach.
     """
     import asyncio
-    import subprocess
 
+    from eaccode._subprocess_compat import bounded_git_probe
     from eaccode.orchestrator.queue import JobQueue
 
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
-    try:
-        diff = subprocess.run(
-            ["git", "diff", diff_ref], capture_output=True, text=True, cwd=Path.cwd()
-        ).stdout
-    except FileNotFoundError:
-        click.echo("Error: git is not installed or not a git repository.")
-        return
+    # bounded_git_probe: fail-open, never prompts on private remotes,
+    # never hangs on a credential dialog (Phase A.4).
+    diff = bounded_git_probe(["git", "diff", diff_ref], timeout=30)
     if not diff.strip():
         click.echo("No diff to review.")
         return

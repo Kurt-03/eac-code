@@ -13,7 +13,14 @@ from pathlib import Path
 
 import click
 
-from eaccode.config.paths import EaccodePaths
+from eaccode._subprocess_compat import suppress_platform_ver_console
+
+# Windows: stub platform._syscmd_ver before heavyweight imports — many
+# dependencies touch platform.uname() at import time, which otherwise
+# flashes a `cmd /c ver` console window in the REPL (Phase A.5).
+suppress_platform_ver_console()
+
+from eaccode.config.paths import EaccodePaths  # noqa: E402  (after guard)
 
 
 @click.group(invoke_without_command=True)

@@ -154,25 +154,26 @@ def _get_memory(app) -> list[str]:
         return app.memory_facts
     store = getattr(app, "memory_store", None)
     if store is not None:
-        import asyncio
-
-        return asyncio.run(
-            store.recall(type(app).project_hash(app.workdir))
-        ) if hasattr(type(app), "project_hash") else []
+        # Sync path: MemoryStore ops are plain file IO; calling
+        # asyncio.run() from inside Textual's running loop raises
+        # RuntimeError (Phase A.6).
+        project_hash_fn = getattr(type(app), "project_hash", None)
+        if project_hash_fn is not None:
+            return store.recall_sync(project_hash_fn(app.workdir))
     return []
 
 
 def _save_memory(app, text: str) -> None:
     store = getattr(app, "memory_store", None)
     if store is not None:
-        import asyncio
-
-        asyncio.run(store.remember(type(app).project_hash(app.workdir), text, source="user"))
+        project_hash_fn = getattr(type(app), "project_hash", None)
+        if project_hash_fn is not None:
+            store.remember_sync(project_hash_fn(app.workdir), text, source="user")
 
 
 def _forget_memory(app, text: str) -> None:
     store = getattr(app, "memory_store", None)
     if store is not None:
-        import asyncio
-
-        asyncio.run(store.forget(type(app).project_hash(app.workdir), text))
+        project_hash_fn = getattr(type(app), "project_hash", None)
+        if project_hash_fn is not None:
+            store.forget_sync(project_hash_fn(app.workdir), text)

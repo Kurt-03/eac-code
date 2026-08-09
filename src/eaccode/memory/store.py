@@ -2,7 +2,15 @@
 
 The agent learns facts during work; they are injected into the system
 prompt on the next session start. Facts only — rules stay user-only.
+
+Note: the read/write operations are plain file IO with no awaits, so the
+core methods are SYNC (``remember_sync``/``recall_sync``/``forget_sync``).
+The async variants exist for back-compat with the pre-split API and the
+agent loop; UI code (slash commands inside the Textual event loop) MUST
+use the sync variants — calling ``asyncio.run`` from inside Textual's
+running loop crashes with RuntimeError (Phase A.6).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -28,14 +36,16 @@ class MemoryStore:
             cur = cur.parent
         return hashlib.sha256(str(cur).encode()).hexdigest()[:16]
 
-    async def remember(self, project_hash: str, text: str, source: str = "agent") -> None:
+    # ------------------------------------------------------------ sync core
+
+    def remember_sync(self, project_hash: str, text: str, source: str = "agent") -> None:
         entry = {"text": text, "source": source, "created_at": datetime.now().isoformat()}
         path = self._file(project_hash)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         self._trim(path)
 
-    async def recall(self, project_hash: str) -> list[str]:
+    def recall_sync(self, project_hash: str) -> list[str]:
         path = self._file(project_hash)
         if not path.exists():
             return []
@@ -47,7 +57,7 @@ class MemoryStore:
                 continue
         return texts
 
-    async def forget(self, project_hash: str, text: str) -> None:
+    def forget_sync(self, project_hash: str, text: str) -> None:
         path = self._file(project_hash)
         if not path.exists():
             return
@@ -58,3 +68,14 @@ class MemoryStore:
         lines = path.read_text(encoding="utf-8").splitlines()
         if len(lines) > self.max_entries:
             path.write_text("\n".join(lines[-self.max_entries :]) + "\n", encoding="utf-8")
+
+    # ------------------------------------------------ async back-compat API
+
+    async def remember(self, project_hash: str, text: str, source: str = "agent") -> None:
+        self.remember_sync(project_hash, text, source)
+
+    async def recall(self, project_hash: str) -> list[str]:
+        return self.recall_sync(project_hash)
+
+    async def forget(self, project_hash: str, text: str) -> None:
+        self.forget_sync(project_hash, text)
