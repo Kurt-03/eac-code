@@ -30,7 +30,7 @@ def test_exact_failure_warns_then_blocks_with_hard_stop():
                           exact_failure_block_after=3)
     c = ToolCallGuardrailController(cfg)
     args = {"command": "pytest"}
-    for i in range(3):
+    for _ in range(3):
         c.before_call("bash", args)
         d = c.after_call("bash", args, "Error: failed", failed=True)
     # 3rd failure after warn threshold → warn; 4th call → block
@@ -60,7 +60,7 @@ def test_recovery_hint_is_specific():
 def test_idempotent_no_progress_warns():
     cfg = GuardrailConfig(no_progress_warn_after=2)
     c = ToolCallGuardrailController(cfg)
-    for i in range(2):
+    for _ in range(2):
         d = c.after_call("read", {"path": "a.py"}, "same content", failed=False)
     assert d.action == "warn"
     assert "same result" in d.message
@@ -116,6 +116,8 @@ def test_registry_classification_used_for_idempotent():
 
     cfg = GuardrailConfig(no_progress_warn_after=2)
     c = ToolCallGuardrailController(cfg)
-    for i in range(2):
-        d = c.after_call("custom_read", {"path": "x"}, "same", failed=False, registry=FakeRegistry())
+    for _ in range(2):
+        d = c.after_call(
+            "custom_read", {"path": "x"}, "same", failed=False, registry=FakeRegistry()
+        )
     assert d.action == "warn"

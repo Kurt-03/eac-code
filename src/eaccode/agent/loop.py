@@ -226,7 +226,11 @@ class AgentLoop:
         # Phase C.3: loop guardrails — before the call.
         guard = self.guardrails.before_call(tc.name, tc.arguments, registry=self.executor.registry)
         if guard.action == "block":
-            return ToolResult(content=guard.message, is_error=True, metadata={"guardrail": guard.code})
+            return ToolResult(
+                content=guard.message,
+                is_error=True,
+                metadata={"guardrail": guard.code},
+            )
 
         result = await self._execute_with_permission(tc, ctx)
 

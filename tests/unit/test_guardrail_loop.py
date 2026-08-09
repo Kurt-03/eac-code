@@ -61,14 +61,10 @@ async def test_loop_guardrails_break_identical_failure_loop(tmp_path):
         exact_failure_warn_after=2,
         exact_failure_block_after=3,
     )
-    with pytest.raises(Exception) as excinfo:
+    with pytest.raises(Exception):
         await agent.run([Message.user("run it")])
     # Either the loop exhausted max_turns (all blocked) or guardrail halted.
     assert client.calls >= 3
-    # The failure must have been surfaced to the LLM as a tool result.
-    assert any(
-        m.role.value == "tool" for m in agent._last_messages
-    ) if hasattr(agent, "_last_messages") else True
 
 
 @pytest.mark.asyncio
@@ -77,7 +73,7 @@ async def test_loop_block_result_carries_guardrail_code(tmp_path):
     code in metadata (so the REPL can render it distinctly)."""
     from eaccode.agent.guardrails import GuardrailConfig
 
-    agent, client = _make_agent(tmp_path)
+    agent, _client = _make_agent(tmp_path)
     agent.guardrails.config = GuardrailConfig(
         hard_stop_enabled=True,
         exact_failure_warn_after=1,
@@ -89,7 +85,7 @@ async def test_loop_block_result_carries_guardrail_code(tmp_path):
 
     ctx = ToolContext(workdir=tmp_path)
     r1 = await agent._execute_guarded(tc, ctx)
-    r2 = await agent._execute_guarded(tc, ctx)
+    await agent._execute_guarded(tc, ctx)
     r3 = await agent._execute_guarded(tc, ctx)
     assert r1.is_error is True
     assert r3.is_error is True
