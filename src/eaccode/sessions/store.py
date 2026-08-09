@@ -68,8 +68,17 @@ class SessionStore:
     ) -> str:
         sid = session_id or str(uuid.uuid4())
         now = datetime.now().isoformat()
+        # Provenance (Phase G.6): a user-given title must survive — only
+        # auto-generated ("untitled"-derived) titles get refreshed on save.
         if not title or title == "untitled":
-            title = generate_title(messages)
+            with sqlite3.connect(self.db_path) as _conn:
+                existing = _conn.execute(
+                    "SELECT title FROM sessions WHERE id = ?", (sid,)
+                ).fetchone()
+            if existing and existing[0] not in ("untitled",):
+                title = existing[0]  # keep the user's title
+            else:
+                title = generate_title(messages)
         # Redact credential-like strings before anything hits disk (Phase A.2)
         from eaccode.security.redact import redact_secrets
 

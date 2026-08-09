@@ -455,22 +455,24 @@ class EaccodeApp(App):
         return f"Retrying: {self._last_prompt}"
 
     def action_copy_last(self) -> None:
-        """Copy the last assistant answer to the Windows clipboard."""
+        """Copy the last assistant answer to the system clipboard (G.4)."""
         if not self._last_answer:
             self.query_one("#log", RichLog).write(
                 "[dim]Nothing to copy yet.[/dim]"
             )
             return
-        import subprocess
+        from eaccode.ui.clipboard import write_clipboard_text
 
         try:
-            subprocess.run(
-                ["clip"], input=self._last_answer.encode("utf-16-le"),
-                check=False,
-            )
-            self.query_one("#log", RichLog).write(
-                "[dim]✓ Last answer copied to clipboard (paste with Ctrl+V)[/dim]"
-            )
+            if write_clipboard_text(self._last_answer):
+                self.query_one("#log", RichLog).write(
+                    "[dim]✓ Last answer copied to clipboard (paste with Ctrl+V)[/dim]"
+                )
+            else:
+                self.query_one("#log", RichLog).write(
+                    "[dim]✗ No clipboard tool available on this platform "
+                    "(need wl-copy/xclip/xsel on Linux).[/dim]"
+                )
         except Exception as e:
             self.query_one("#log", RichLog).write(
                 f"[red]✗ Clipboard failed: {e}[/red]"
