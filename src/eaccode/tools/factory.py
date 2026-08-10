@@ -24,13 +24,14 @@ TOOLSETS: dict[str, set[str]] = {
     "clarify": {"clarify"},
     "delegation": {"delegate_task"},
     "cronjob": {"cronjob"},
-    "vision": {"vision_analyze"},
+    "vision": {"vision_analyze", "video_analyze"},
 }
 
 # Default-on toolsets (everything except niche/opt-in ones).
 DEFAULT_TOOLSETS: set[str] = {
     "web", "terminal", "file", "code_execution", "skills", "todo",
     "memory", "session_search", "clarify", "delegation", "cronjob",
+    "vision",
 }
 
 
@@ -48,7 +49,7 @@ def _all_tools() -> list[Tool]:
     from eaccode.tools.builtin.read import ReadTool
     from eaccode.tools.builtin.search_files import SearchFilesTool
     from eaccode.tools.builtin.todo import TodoWriteTool
-    from eaccode.tools.builtin.vision import VisionAnalyzeTool
+    from eaccode.tools.builtin.vision import VideoAnalyzeTool, VisionAnalyzeTool
     from eaccode.tools.builtin.web_extract import WebExtractTool
     from eaccode.tools.builtin.write import WriteTool
 
@@ -70,6 +71,7 @@ def _all_tools() -> list[Tool]:
         WebExtractTool(),
         ProcessTool(),
         VisionAnalyzeTool(),
+        VideoAnalyzeTool(),
     ]
 
 
