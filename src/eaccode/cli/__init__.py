@@ -85,6 +85,7 @@ def paths() -> None:
 # these must run after `main` is defined, hence the late imports
 from eaccode.cli import (  # noqa: E402
     commands_config,  # noqa: F401
+    commands_cron,  # noqa: F401
     commands_curator,  # noqa: F401
     commands_mcp,  # noqa: F401
     commands_providers,  # noqa: F401

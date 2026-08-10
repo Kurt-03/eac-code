@@ -70,3 +70,48 @@ async def test_delegate_runs_subagent(tmp_path):
     result = await tool.run(DelegateInput(goal="go"), ctx)
     assert result.is_error is False
     assert "subagent result!" in result.content
+
+
+@pytest.mark.asyncio
+async def test_batch_mode_parallel_tasks(tmp_path):
+    """Phase I.13: tasks array runs in parallel and consolidates results."""
+    from eaccode.tools.builtin.delegate import DelegateInput, DelegateTask, DelegateTool
+
+    results = []
+
+    async def fake_builder(workdir, max_turns=15):
+        from eaccode.agent.loop import AgentConfig, AgentLoop
+        from eaccode.config.settings import PermissionMode
+        from eaccode.llm.client import CompletionResponse, TokenUsage
+        from eaccode.permissions.policy import PolicyEngine
+        from eaccode.permissions.rules import RuleSet
+        from eaccode.tools.base import ToolRegistry
+
+        class FakeClient:
+            def complete(self, req):
+                goal = req.messages[-1].text
+                results.append(goal)
+                return CompletionResponse(
+                    text=f"done: {goal[:20]}", tool_calls=[],
+                    stop_reason="end_turn", usage=TokenUsage(), model="fake",
+                )
+
+        reg = ToolRegistry()
+        agent = AgentLoop(FakeClient(), reg,
+                          PolicyEngine(mode=PermissionMode.BYPASS_PERMISSIONS,
+                                       rules=RuleSet()),
+                          AgentConfig(workdir=workdir, max_turns=3))
+        return agent, reg, PolicyEngine(mode=PermissionMode.BYPASS_PERMISSIONS,
+                                        rules=RuleSet())
+
+    tool = DelegateTool()
+    tool.delegate_builder = fake_builder
+    ctx = ToolContext(workdir=tmp_path)
+    result = await tool.run(DelegateInput(tasks=[
+        DelegateTask(goal="task A"),
+        DelegateTask(goal="task B"),
+    ]), ctx)
+    assert result.is_error is False
+    assert "task A" in result.content
+    assert "task B" in result.content
+    assert len(results) == 2  # both subagents ran

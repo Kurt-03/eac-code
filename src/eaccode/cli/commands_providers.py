@@ -21,7 +21,10 @@ def providers() -> None:
 @click.option("--model", required=True, help="Default model for this provider")
 @click.option("--api-key", prompt=True, hide_input=True, help="API key (prompted hidden)")
 @click.option("--base-url", default=None, help="Custom API base URL (OpenAI-compatible endpoints)")
-def providers_add(provider: str, model: str, api_key: str, base_url: str | None) -> None:
+@click.option("--vision", is_flag=True, default=False,
+              help="Mark this provider as vision-capable (extra: vision=true)")
+def providers_add(provider: str, model: str, api_key: str, base_url: str | None,
+                  vision: bool = False) -> None:
     """Add a provider + API key (BYOK)."""
     paths = EaccodePaths()
     existing = load_providers(paths.providers_file)
@@ -32,8 +35,10 @@ def providers_add(provider: str, model: str, api_key: str, base_url: str | None)
                 f"or edit {paths.providers_file} directly."
             )
             raise SystemExit(1)
+    extra = {"vision": "true"} if vision else {}
     existing.append(
-        ProviderConfig(name=provider, api_key=api_key, model=model, base_url=base_url)  # type: ignore[arg-type]
+        ProviderConfig(name=provider, api_key=api_key, model=model,
+                       base_url=base_url, extra=extra)  # type: ignore[arg-type]
     )
     save_providers(existing, paths.providers_file)
     paths.providers_file.chmod(0o600)
