@@ -103,6 +103,18 @@ def get_command(name: str) -> CommandDef | None:
     return _COMMAND_INDEX.get(name.lstrip("/").lower())
 
 
+def register_command(cmd: CommandDef) -> None:
+    """Add a runtime command (Phase I.12 — plugin slash commands).
+
+    Keeps the registry and the O(1) index in sync. Built-ins are
+    registered at import time; plugins register during startup.
+    """
+    COMMAND_REGISTRY.append(cmd)
+    _COMMAND_INDEX[cmd.name] = cmd
+    for alias in cmd.aliases:
+        _COMMAND_INDEX[alias] = cmd
+
+
 def all_command_names() -> list[str]:
     """Every dispatchable name incl. aliases, each prefixed with '/'."""
     names: list[str] = []

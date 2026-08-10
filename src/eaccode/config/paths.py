@@ -36,6 +36,7 @@ class EaccodePaths:
     sessions_dir: Path
     memory_dir: Path
     skills_dir: Path
+    plugins_dir: Path
     providers_file: Path
     settings_file: Path
     cron_db: Path
@@ -50,8 +51,10 @@ class EaccodePaths:
         object.__setattr__(self, "sessions_dir", dat / "sessions")
         object.__setattr__(self, "memory_dir", dat / "memory")
         object.__setattr__(self, "skills_dir", cfg / "skills")
+        object.__setattr__(self, "plugins_dir", cfg / "plugins")
         object.__setattr__(self, "providers_file", cfg / "providers.yaml")
         object.__setattr__(self, "settings_file", cfg / "eaccode.yaml")
         object.__setattr__(self, "cron_db", dat / "cron.db")
-        for d in (cfg, dat, cache, self.sessions_dir, self.memory_dir, self.skills_dir):
+        for d in (cfg, dat, cache, self.sessions_dir, self.memory_dir,
+                  self.skills_dir, self.plugins_dir):
             d.mkdir(parents=True, exist_ok=True)

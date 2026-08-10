@@ -88,8 +88,18 @@ class EaccodeApp(App):
         self._mode_name = ""
         self._show_reasoning = False
         self._total_usage = TokenUsage()
+        self._install_plugin_commands()
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
+
+    def _install_plugin_commands(self) -> None:
+        """Phase I.12: wire context-engine plugin slash commands before the
+        suggester is built, so completion/help/palette see them."""
+        from eaccode.config.paths import EaccodePaths
+        from eaccode.context.engine import get_engine
+        from eaccode.ui.commands import install_plugin_commands
+
+        install_plugin_commands(get_engine(EaccodePaths().plugins_dir).slash_specs())
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)

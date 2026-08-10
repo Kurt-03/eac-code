@@ -287,6 +287,43 @@ DISPATCH_TABLE: dict[str, object] = {
 
 
 # ---------------------------------------------------------------------------
+# Plugin slash commands (Phase I.12, context engine) — runtime registration.
+# ---------------------------------------------------------------------------
+
+def install_plugin_commands(specs) -> None:
+    """Wire plugin slash commands into the registries.
+
+    Call once at REPL startup, before the suggester is built, so
+    autocomplete, /help, and the command palette pick them up. Built-in
+    commands always win; duplicate plugin registrations are ignored.
+    """
+    from eaccode.ui.command_def import CommandDef, register_command
+
+    for spec in specs:
+        if spec.name in DISPATCH_TABLE:
+            continue
+        if get_command(spec.name) is None:
+            register_command(
+                CommandDef(spec.name, spec.description, spec.category)
+            )
+        DISPATCH_TABLE[spec.name] = _plugin_handler(spec.handler)
+
+
+def _plugin_handler(plugin_fn):
+    """Wrap a pure (arg: str) -> str plugin handler into an app handler."""
+
+    def handler(app, arg: str) -> CommandResult:
+        try:
+            return CommandResult(message=str(plugin_fn(arg)))
+        except Exception as e:
+            return CommandResult(
+                message=f"Plugin command failed: {type(e).__name__}: {e}"
+            )
+
+    return handler
+
+
+# ---------------------------------------------------------------------------
 # Memory helpers — sync (MemoryStore ops are plain file IO; asyncio.run from
 # inside Textual's running loop raises RuntimeError, Phase A.6).
 # ---------------------------------------------------------------------------

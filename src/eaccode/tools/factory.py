@@ -37,6 +37,7 @@ DEFAULT_TOOLSETS: set[str] = {
 
 def _all_tools() -> list[Tool]:
     from eaccode.config.paths import EaccodePaths
+    from eaccode.context.engine import get_engine
     from eaccode.memory.skill_tools import SkillCreateTool, SkillListTool, SkillPatchTool
     from eaccode.tools.builtin.bash import BashTool
     from eaccode.tools.builtin.clarify import ClarifyTool
@@ -72,6 +73,8 @@ def _all_tools() -> list[Tool]:
         ProcessTool(),
         VisionAnalyzeTool(),
         VideoAnalyzeTool(),
+        # Phase I.12: plugin-registered runtime tools (context engine).
+        *get_engine(EaccodePaths().plugins_dir).build_tools(),
     ]
 
 

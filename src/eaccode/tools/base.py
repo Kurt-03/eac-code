@@ -46,10 +46,12 @@ class ToolResult(BaseModel):
 
 
 class Tool(ABC):
-    name: ClassVar[str]
-    description: ClassVar[str]
-    input_model: ClassVar[type[BaseModel]]
-    requires_permission: ClassVar[bool] = True
+    # Not ClassVar: plugin tools (context_engine, Phase I.12) set these
+    # per-instance, so the annotations must allow instance assignment.
+    name: str
+    description: str
+    input_model: type[BaseModel]
+    requires_permission: bool = True
     # Phase C.1: loop-guardrail classification (default: mutating — the
     # safe assumption; read-style tools override to idempotent).
     tool_class: ClassVar[ToolClass] = ToolClass.MUTATING
