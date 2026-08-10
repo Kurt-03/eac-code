@@ -18,7 +18,8 @@ htmlcov/
 *.db-shm
 
 # Hermes workspace artifacts
-.hermes/
+# plans/ is project documentation (tracked); archive/ stays local
+.hermes/archive/
 
 # OS
 .DS_Store
