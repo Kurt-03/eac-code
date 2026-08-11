@@ -31,13 +31,15 @@ from eaccode.ui.suggester import SlashCommandSuggester
 class PermissionAwareInput(Input):
     """Input that hands y/a/n/p/Esc to the app while a permission is pending.
 
-    ``Input._on_key`` stops printable keys and inserts them as text, which
-    is exactly why bare ``App.on_key`` never saw the permission letters
-    (v0.4.0.x regression). This subclass checks the app's pending ask
-    first and resolves it instead of inserting the character.
+    ``Input._on_key`` is async in Textual 8 and stops printable keys to
+    insert them as text — which is exactly why bare ``App.on_key`` never
+    saw the permission letters (v0.4.0.x regression). This subclass
+    checks the app's pending ask first and resolves it instead of
+    inserting the character; otherwise it must ``await`` the base
+    handler (a sync call would drop the insert coroutine).
     """
 
-    def _on_key(self, event) -> None:
+    async def _on_key(self, event) -> None:
         app = self.app
         if getattr(app, "_pending_permission", None):
             key = event.key.lower()
@@ -46,7 +48,7 @@ class PermissionAwareInput(Input):
                 event.stop()
                 event.prevent_default()
                 return
-        super()._on_key(event)
+        await super()._on_key(event)
 
 
 class EaccodeApp(App):
