@@ -59,12 +59,13 @@ def diff_for_write(path: Path, content: str, max_lines: int = 30) -> str | None:
 
 
 class PermissionModal(ModalScreen):
-    """y = allow once · a = always allow · n = deny. Esc = deny."""
+    """y = allow once · a = always allow · n = deny · p = pause. Esc = deny."""
 
     BINDINGS: ClassVar = [
         Binding("y", "allow_once", "Allow once"),
         Binding("a", "allow_always", "Always allow"),
         Binding("n", "deny", "Deny"),
+        Binding("p", "pause", "Pause session"),
         Binding("escape", "deny", "Deny"),
     ]
 
@@ -88,6 +89,7 @@ class PermissionModal(ModalScreen):
                 yield Button("Allow once (y)", id="perm-y", variant="primary")
                 yield Button("Always allow (a)", id="perm-a", variant="success")
                 yield Button("Deny (n)", id="perm-n", variant="error")
+                yield Button("Pause (p)", id="perm-p", variant="warning")
 
     def on_mount(self) -> None:
         self.query_one("#perm-y", Button).focus()
@@ -99,6 +101,8 @@ class PermissionModal(ModalScreen):
             self.action_allow_always()
         elif event.button.id == "perm-n":
             self.action_deny()
+        elif event.button.id == "perm-p":
+            self.action_pause()
 
     def _diff_preview(self) -> str | None:
         """Inline diff for write/edit calls (Phase B.2)."""
@@ -138,4 +142,8 @@ class PermissionModal(ModalScreen):
 
     def action_deny(self) -> None:
         self._resolve_cb(PermissionChoice.DENY)
+        self.dismiss()
+
+    def action_pause(self) -> None:
+        self._resolve_cb(PermissionChoice.PAUSE)
         self.dismiss()

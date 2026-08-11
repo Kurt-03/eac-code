@@ -89,6 +89,11 @@ class EaccodeApp(App):
         self._show_reasoning = False
         self._total_usage = TokenUsage()
         self._install_plugin_commands()
+        # P0.9: persistent allowlist + per-pattern approval counters.
+        from eaccode.permissions.allowlist import AllowlistStore
+
+        self._allowlist = AllowlistStore()
+        self._approval_counts: dict[str, int] = {}
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
 
@@ -155,6 +160,14 @@ class EaccodeApp(App):
         self._agent = agent
         # Phase B.1: wire the in-REPL permission modal into the loop.
         agent.config.ask_async = self._ask_permission_async
+        # P0.8: the `P` approve level pauses the session; /resume unpauses.
+        if agent.config.pause_flag is None:
+            from eaccode.permissions.session import PauseFlag
+
+            agent.config.pause_flag = PauseFlag()
+        self._pause_flag = agent.config.pause_flag
+        # P0.9: wire the persistent allowlist into the policy engine.
+        agent.policy.allowlist = self._allowlist
         self.memory_facts = sysctx.memory_facts
         if mcp_tools:
             log.write(f"[dim]mcp: {len(mcp_tools)} external tool(s) loaded[/dim]")
@@ -216,7 +229,35 @@ class EaccodeApp(App):
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         modal = PermissionModal(tool_name, arguments, question, resolve=future.set_result)
         self.push_screen(modal)
+        # P0.9: count approvals; after 3x of the same pattern suggest the
+        # allowlist (one hint, then the counter resets).
+        future.add_done_callback(
+            lambda f: self._on_approval_resolved(tool_name, arguments, f)
+        )
         return future
+
+    def _on_approval_resolved(self, tool_name: str, arguments: dict, future) -> None:
+        """P0.9 suggest-mode: after repeated approvals, offer /allow."""
+        from eaccode.permissions.allowlist import suggest_pattern
+        from eaccode.permissions.prompts import PermissionChoice
+
+        try:
+            choice = future.result()
+        except Exception:
+            return
+        if choice not in (PermissionChoice.ALLOW_ONCE, PermissionChoice.ALLOW_ALWAYS):
+            return
+        pattern = suggest_pattern(tool_name, arguments)
+        key = f"{tool_name}|{pattern}"
+        count = self._approval_counts.get(key, 0) + 1
+        self._approval_counts[key] = count
+        if count >= 3:
+            self._approval_counts[key] = 0  # one hint per pattern
+            log = self.query_one("#log", RichLog)
+            log.write(
+                f"[dim][ i ] Approved {tool_name} {count}x — save it permanently "
+                f"with /allow {tool_name} '{pattern}'[/dim]"
+            )
 
     async def _run_agent_streaming(self, log: RichLog) -> None:
         """Run the loop with live streaming: text deltas + tool cards."""

@@ -118,3 +118,29 @@ async def test_agent_loop_usage_accumulates(tmp_path):
     assert result.turns == 2
     assert result.usage.input_tokens == 30
     assert result.usage.output_tokens == 15
+
+
+@pytest.mark.asyncio
+async def test_paused_session_rejects_tool_calls(tmp_path):
+    """P0.8: with the pause flag set, every tool call is rejected with a
+    hint — no permission prompt, no execution."""
+    from eaccode.permissions.session import PauseFlag
+
+    client = MockClient([
+        _tool_response(ToolCall(id="t1", name="read", arguments={"path": "x.txt"})),
+        _final_response("I will wait."),
+    ])
+    reg = ToolRegistry()
+    reg.register(ReadTool())
+    policy = PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet())
+    flag = PauseFlag()
+    flag.pause()
+    agent = AgentLoop(
+        client, reg, policy, AgentConfig(workdir=tmp_path, pause_flag=flag)
+    )
+    (tmp_path / "x.txt").write_text("c")
+    result = await agent.run([Message.user("go")])
+    tool_msgs = [m for m in result.messages if m.role.value == "tool"]
+    assert len(tool_msgs) == 1
+    assert "paused" in tool_msgs[0].text.lower()
+    assert "resume" in tool_msgs[0].text.lower()

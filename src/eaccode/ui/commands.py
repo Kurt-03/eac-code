@@ -68,6 +68,54 @@ def _cmd_mode(app, arg: str) -> CommandResult:
         )
 
 
+def _cmd_pause(app, arg: str) -> CommandResult:
+    flag = getattr(app, "_pause_flag", None)
+    if flag is not None:
+        flag.pause()
+        return CommandResult(
+            message="Session paused — no tool calls will run until /resume."
+        )
+    return CommandResult(message="No pause flag in this context.")
+
+
+def _cmd_resume(app, arg: str) -> CommandResult:
+    flag = getattr(app, "_pause_flag", None)
+    if flag is not None:
+        flag.resume()
+        return CommandResult(message="Session resumed.")
+    return CommandResult(message="No pause flag in this context.")
+
+
+def _cmd_allow(app, arg: str) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    if not parts:
+        return CommandResult(
+            message="Usage: /allow <tool> [pattern] — e.g. /allow bash 'pytest *'"
+        )
+    tool = parts[0]
+    pattern = parts[1] if len(parts) > 1 else "*"
+    store = getattr(app, "_allowlist", None)
+    if store is None:
+        return CommandResult(message="No allowlist in this context.")
+    store.add(tool, pattern, scope="always")
+    return CommandResult(message=f"Allowlist: {tool} {pattern!r} saved (always).")
+
+
+def _cmd_disallow(app, arg: str) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    if not parts:
+        return CommandResult(message="Usage: /disallow <tool> [pattern]")
+    tool = parts[0]
+    pattern = parts[1] if len(parts) > 1 else "*"
+    store = getattr(app, "_allowlist", None)
+    if store is None:
+        return CommandResult(message="No allowlist in this context.")
+    removed = store.remove(tool, pattern)
+    if removed:
+        return CommandResult(message=f"Removed {tool} {pattern!r} from the allowlist.")
+    return CommandResult(message=f"Nothing to remove: {tool} {pattern!r}.")
+
+
 def _cmd_model(app, arg: str) -> CommandResult:
     if not arg:
         return CommandResult(
@@ -267,6 +315,10 @@ DISPATCH_TABLE: dict[str, object] = {
     "exit": _cmd_exit,
     "help": _cmd_help,
     "mode": _cmd_mode,
+    "pause": _cmd_pause,
+    "resume": _cmd_resume,
+    "allow": _cmd_allow,
+    "disallow": _cmd_disallow,
     "model": _cmd_model,
     "reasoning": _cmd_reasoning,
     "undo": _cmd_undo,

@@ -82,6 +82,41 @@ class TestPermissionPrompt:
         assert result is False  # fail closed
 
     @pytest.mark.asyncio
+    async def test_pause_choice_pauses_session(self):
+        """P0.8: the P level sets the pause flag and denies the call."""
+        from eaccode.permissions.session import PauseFlag
+
+        flag = PauseFlag()
+
+        async def ask(q):
+            return PermissionChoice.PAUSE
+
+        result = await prompt_for_permission_async(
+            "bash", {"command": "ls"}, ask_async=ask, pause_flag=flag
+        )
+        assert result is False
+        assert flag.paused is True
+
+    def test_sync_pause_choice_pauses_session(self):
+        from eaccode.permissions.session import PauseFlag
+
+        flag = PauseFlag()
+        result = prompt_for_permission(
+            "bash", {"command": "ls"},
+            ask_callback=lambda q: PermissionChoice.PAUSE,
+            pause_flag=flag,
+        )
+        assert result is False
+        assert flag.paused is True
+
+    def test_pause_without_flag_denies_but_does_not_crash(self):
+        result = prompt_for_permission(
+            "bash", {"command": "ls"},
+            ask_callback=lambda q: PermissionChoice.PAUSE,
+        )
+        assert result is False
+
+    @pytest.mark.asyncio
     async def test_async_always_allow_records_rule(self):
         rules: list[Rule] = []
 

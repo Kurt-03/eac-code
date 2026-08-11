@@ -26,6 +26,7 @@ class PermissionChoice(str, enum.Enum):  # noqa: UP042  (str value for JSON/sche
     ALLOW_ONCE = "allow-once"
     ALLOW_ALWAYS = "allow-always"
     DENY = "deny"
+    PAUSE = "pause"  # P0.8: pause the session — no further tool calls
 
 
 # How long the REPL modal waits before denying (Hermes uses 120s; 60s is
@@ -60,18 +61,18 @@ def prompt_for_permission(
     *,
     session_rules: list[Rule] | None = None,
     ask_callback=None,
+    pause_flag=None,
 ) -> bool:
     """SYNC ask (legacy/headless path). Returns True if approved.
 
     ``ask_callback`` is a sync ``callable(question: str) -> PermissionChoice``.
     When None, falls back to click.confirm on TTYs; non-TTY denies.
     The REPL must use :func:`prompt_for_permission_async` instead.
+    ``pause_flag`` (P0.8): a PAUSE choice pauses the session.
     """
     if ask_callback is not None:
         choice = ask_callback(build_permission_question(tool, arguments))
-        if choice == PermissionChoice.ALLOW_ALWAYS and session_rules is not None:
-            _remember_rule(session_rules, tool, arguments)
-        return choice in (PermissionChoice.ALLOW_ONCE, PermissionChoice.ALLOW_ALWAYS)
+        return _handle_choice(choice, tool, arguments, session_rules, pause_flag)
 
     # Headless / legacy path.
     if not sys.stdin.isatty():
@@ -91,17 +92,21 @@ async def prompt_for_permission_async(
     session_rules: list[Rule] | None = None,
     ask_async=None,
     timeout: float = MODAL_TIMEOUT_SECONDS,
+    pause_flag=None,
 ) -> bool:
     """ASYNC ask for the REPL. Awaits the modal's Future (loop-safe).
 
     ``ask_async(question: str) -> asyncio.Future[PermissionChoice]`` —
     the UI pushes the modal and resolves the Future on button press.
     Timeout (default 60s) → DENY (fail closed, like the non-TTY path).
+    ``pause_flag`` (P0.8): a PAUSE choice pauses the session.
     """
     import asyncio
 
     if ask_async is None:
-        return prompt_for_permission(tool, arguments, session_rules=session_rules)
+        return prompt_for_permission(
+            tool, arguments, session_rules=session_rules, pause_flag=pause_flag
+        )
 
     question = build_permission_question(tool, arguments)
     future = ask_async(question)
@@ -111,8 +116,23 @@ async def prompt_for_permission_async(
         choice = PermissionChoice.DENY  # modal timed out / never resolved
     except Exception:
         choice = PermissionChoice.DENY  # modal failed — fail closed
+    return _handle_choice(choice, tool, arguments, session_rules, pause_flag)
+
+
+def _handle_choice(
+    choice: PermissionChoice,
+    tool: str,
+    arguments: dict,
+    session_rules: list[Rule] | None,
+    pause_flag,
+) -> bool:
+    """Shared choice handling for sync + async ask paths (P0.8)."""
     if choice == PermissionChoice.ALLOW_ALWAYS and session_rules is not None:
         _remember_rule(session_rules, tool, arguments)
+    if choice == PermissionChoice.PAUSE:
+        if pause_flag is not None:
+            pause_flag.pause()
+        return False
     return choice in (PermissionChoice.ALLOW_ONCE, PermissionChoice.ALLOW_ALWAYS)
 
 

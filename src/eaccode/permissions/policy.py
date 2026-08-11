@@ -48,9 +48,12 @@ _MODE_DEFAULTS: dict[PermissionMode, dict[str, Action]] = {
 
 
 class PolicyEngine:
-    def __init__(self, mode: PermissionMode, rules: RuleSet) -> None:
+    def __init__(self, mode: PermissionMode, rules: RuleSet,
+                 allowlist=None) -> None:
         self.mode = mode
         self.rules = rules
+        # P0.9: persistent allowlist consulted before the mode default.
+        self.allowlist = allowlist
 
     def decide(self, tool: str, arguments: dict) -> Decision:
         deny_rule: Rule | None = None
@@ -65,6 +68,18 @@ class PolicyEngine:
 
         if deny_rule:
             return Decision(Action.DENY, f"Denied by rule: {deny_rule}", deny_rule)
+
+        # P0.9: an explicit allowlist entry wins over the mode default
+        # (an "always" the user chose once must survive PLAN mode), but
+        # explicit DENY rules above still win.
+        if self.allowlist is not None:
+            entry = self.allowlist.check(tool, arguments)
+            if entry is not None:
+                return Decision(
+                    Action.ALLOW,
+                    f"Allowed by allowlist ({entry.scope})",
+                    None,
+                )
 
         if self.mode == PermissionMode.BYPASS_PERMISSIONS:
             reason = (

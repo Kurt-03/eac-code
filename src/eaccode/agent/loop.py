@@ -43,6 +43,9 @@ class AgentConfig:
     # callable(tool_name, arguments, question) -> Future[PermissionChoice].
     # When None, the sync click.confirm path (or headless deny) is used.
     ask_async: Callable[[str, dict, str], object] | None = None
+    # P0.8: session pause flag — when set and paused, every tool call is
+    # rejected with a hint until the user resumes (/resume in the REPL).
+    pause_flag: object | None = None
 
 
 @dataclass
@@ -274,6 +277,17 @@ class AgentLoop:
         return result
 
     async def _execute_with_permission(self, tc: ToolCall, ctx: ToolContext):
+        # P0.8: paused sessions reject every tool call with a clear hint.
+        if self.config.pause_flag is not None and self.config.pause_flag.paused:
+            from eaccode.tools.base import ToolResult
+
+            return ToolResult(
+                content=(
+                    "Session is paused (Pause was chosen in a permission "
+                    "prompt). Resume with /resume before using tools."
+                ),
+                is_error=True,
+            )
         decision = self.policy.decide(tc.name, tc.arguments)
         if decision.action.value == "deny":
             from eaccode.tools.base import ToolResult
@@ -289,11 +303,14 @@ class AgentLoop:
                 granted = await prompt_for_permission_async(
                     tc.name, tc.arguments,
                     session_rules=self.session_rules,
+                    pause_flag=self.config.pause_flag,
                     ask_async=lambda q: self.config.ask_async(tc.name, tc.arguments, q),  # type: ignore[misc]
                 )
             else:
                 granted = prompt_for_permission(
-                    tc.name, tc.arguments, session_rules=self.session_rules
+                    tc.name, tc.arguments,
+                    session_rules=self.session_rules,
+                    pause_flag=self.config.pause_flag,
                 )
             if not granted:
                 from eaccode.tools.base import ToolResult
