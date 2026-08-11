@@ -753,15 +753,15 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| G.1 Terminal-Vollausbau (PTY) | ⬜ | — |
-| G.2 Process-Registry | ⬜ | — |
-| G.3 Daemon-Pool | ⬜ | — |
-| G.4 MCP-Vollausbau | ⬜ | — |
-| G.5 Cron-Full-Surface | ⬜ | — |
-| G.6 web_search_registry | ⬜ | — |
-| G.7 heartbeat | ⬜ | — |
-| G.8 Tool-Executor parallel | ⬜ | — |
-| G.9 MCP-Server (optional) | ⬜ | — |
+| G.1 Terminal-Vollausbau (PTY) | ✅ | `44dfe38` (POSIX-PTY, Windows-Hinweis) |
+| G.2 Process-Registry | ✅ | `44dfe38` |
+| G.3 Daemon-Pool | ✅ | `44dfe38` |
+| G.4 MCP-Vollausbau | ✅ | `44dfe38` (existierte: connect/call_tool + test_mcp.py, verifiziert) |
+| G.5 Cron-Full-Surface | ✅ | `44dfe38` (no_agent-Watchdog + DB-Migration) |
+| G.6 web_search_registry | ✅ | `82696a7` (keyless DDG — Tool fehlte vorher!) |
+| G.7 heartbeat | ✅ | `532fcac` |
+| G.8 Tool-Executor parallel | ✅ | `a4e68d8` (execute_parallel) |
+| G.9 MCP-Server (optional) | ⬜ | optional — bewusst offen (kein externer Dienst) |
 
 ### Phase H — Tools-Detail & Safety
 
