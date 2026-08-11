@@ -28,6 +28,10 @@ from eaccode.tools.factory import build_default_registry
 _prompt_cache: dict[tuple, SystemContext] = {}
 _PROMPT_CACHE_MAX = 32
 
+# A.6: above this many skills the static injection collapses into an index;
+# trigger-matched skills are injected dynamically per turn by the loop.
+SKILL_INDEX_THRESHOLD = 12
+
 
 @dataclass
 class SystemContext:
@@ -84,7 +88,14 @@ async def build_system_context_async(
         # signal needs real usage, not edit mtimes.
         for s in loaded:
             record_use(s.source)
-        skills = skills_to_system_prompt_section(loaded)
+        # A.6: large skill sets collapse into a compact index; the loop
+        # injects trigger-matched skills dynamically per turn.
+        if len(loaded) > SKILL_INDEX_THRESHOLD:
+            from eaccode.memory.skill_triggers import build_skill_index
+
+            skills = build_skill_index(loaded)
+        else:
+            skills = skills_to_system_prompt_section(loaded)
     # Phase H.2: workspace snapshot (git state + verify commands) —
     # computed per session so the cache key reflects the repo state.
     from eaccode.agent.workspace import build_coding_workspace_block

@@ -103,6 +103,8 @@ class AgentLoop:
             # P0.2: auto-compaction — when the window fills, demote the
             # middle before the next model call (soft tail, ghost defense).
             self._maybe_auto_compact(messages)
+            # A.6: trigger-matched skills enter the turn context.
+            self._maybe_inject_triggered_skills(messages)
             req = CompletionRequest(
                 messages=messages,
                 tools=tool_schemas,
@@ -165,6 +167,39 @@ class AgentLoop:
                 threshold=self.config.compact_threshold,
             )
 
+    def _maybe_inject_triggered_skills(self, messages: list[Message]) -> None:
+        """A.6: dynamic skill injection — trigger-matched skills enter the
+        turn as a system message (recorded as a use for the curator)."""
+        if not self.config.skills_dir or not messages:
+            return
+        last = messages[-1]
+        if last.role.value != "user":
+            return
+        from eaccode.memory.skill_preprocessing import preprocess_skill
+        from eaccode.memory.skill_triggers import select_skills_for_turn
+        from eaccode.memory.skill_usage import record_use
+        from eaccode.memory.skills import (
+            discover_skills,
+            skills_to_system_prompt_section,
+        )
+
+        text = "".join(b.text for b in last.content if b.type == "text")
+        if not text:
+            return
+        pool = discover_skills([self.config.skills_dir])
+        selected = select_skills_for_turn(pool, text)
+        if not selected:
+            return
+        prepared = [
+            preprocess_skill(s, self.config.workdir) for s in selected
+        ]
+        section = skills_to_system_prompt_section(prepared)
+        if not section:
+            return
+        for s in selected:
+            record_use(s.source)
+        messages.append(Message.system(section))
+
     async def run_streaming(
         self,
         messages: list[Message],
@@ -195,6 +230,8 @@ class AgentLoop:
         for turn in range(self.config.max_turns):
             # P0.2: auto-compaction (streaming variant).
             self._maybe_auto_compact(messages)
+            # A.6: trigger-matched skills enter the turn context.
+            self._maybe_inject_triggered_skills(messages)
             req = CompletionRequest(
                 messages=messages,
                 tools=tool_schemas,

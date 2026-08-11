@@ -641,8 +641,8 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 | A.2 Skill-Manager 5+ Actions | ✅ | `1b988b1` |
 | A.3 Skill-Provenance + Usage-Backend | ✅ | `9ec6f07` |
 | A.4 Skill-Linter | ✅ | `a62e86d` |
-| A.5 skill_preprocessing (Template-Vars) | 🔄 | — |
-| A.6 Skill-Triggers + Pre-Filter | ⬜ | — |
+| A.5 skill_preprocessing (Template-Vars) | ✅ | `6bb61b2` |
+| A.6 Skill-Triggers + Pre-Filter | 🔄 | — |
 | A.7 skills_config | ⬜ | — |
 | A.8 default_soul | ⬜ | — |
 | A.9 Memory-Auto-Nudge | ⬜ | — |
