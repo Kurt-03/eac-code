@@ -110,6 +110,8 @@ class AgentLoop:
             self._maybe_auto_compact(messages)
             # A.6: trigger-matched skills enter the turn context.
             self._maybe_inject_triggered_skills(messages)
+            # C.4: finished background delegations enter the turn.
+            self._maybe_collect_delegations(messages)
             # A.9: memory nudge (every N turns without a memory_* call).
             self._maybe_memory_nudge(turn)
             req = CompletionRequest(
@@ -175,6 +177,14 @@ class AgentLoop:
                 model=model,
                 threshold=self.config.compact_threshold,
             )
+
+    def _maybe_collect_delegations(self, messages: list[Message]) -> None:
+        """C.4: finished background delegations enter the next turn."""
+        from eaccode.tools.builtin.delegate import collect_background_results
+
+        results = collect_background_results()
+        if results:
+            messages.append(Message.system("\n".join(results)))
 
     def _maybe_memory_nudge(self, turn: int) -> None:
         """A.9: hint once per window when no memory_* tool was used."""
@@ -253,6 +263,8 @@ class AgentLoop:
             self._maybe_auto_compact(messages)
             # A.6: trigger-matched skills enter the turn context.
             self._maybe_inject_triggered_skills(messages)
+            # C.4: finished background delegations enter the turn.
+            self._maybe_collect_delegations(messages)
             req = CompletionRequest(
                 messages=messages,
                 tools=tool_schemas,

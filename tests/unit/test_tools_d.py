@@ -1,9 +1,17 @@
 """Tests for checkpoints (Phase C.4) + delegate wiring."""
 
+import asyncio
+
 import pytest
 
 from eaccode.tools.base import ToolContext
-from eaccode.tools.builtin.delegate import DelegateInput, DelegateTool
+from eaccode.tools.builtin.delegate import (
+    DelegateInput,
+    DelegateTask,
+    DelegateTool,
+    cancel_all_background,
+    collect_background_results,
+)
 from eaccode.tools.checkpoints import (
     list_checkpoints,
     restore_checkpoint,
@@ -80,7 +88,7 @@ async def test_delegate_runs_subagent(tmp_path):
 @pytest.mark.asyncio
 async def test_batch_mode_parallel_tasks(tmp_path):
     """Phase I.13: tasks array runs in parallel and consolidates results."""
-    from eaccode.tools.builtin.delegate import DelegateInput, DelegateTask, DelegateTool
+    from eaccode.tools.builtin.delegate import DelegateInput, DelegateTool
 
     results = []
 
@@ -120,3 +128,78 @@ async def test_batch_mode_parallel_tasks(tmp_path):
     assert "task A" in result.content
     assert "task B" in result.content
     assert len(results) == 2  # both subagents ran
+
+
+# ---------------------------------------------------------------- C.4
+
+
+@pytest.mark.asyncio
+async def test_background_delegation_returns_immediately(tmp_path):
+    """C.4: background=True returns right away; the result is collected
+    by the loop later."""
+    results: list[str] = []
+
+    async def fake_builder(workdir, max_turns=15):
+        from eaccode.agent.loop import AgentConfig, AgentLoop
+        from eaccode.config.settings import PermissionMode
+        from eaccode.llm.client import TokenUsage
+        from eaccode.permissions.policy import PolicyEngine
+        from eaccode.permissions.rules import RuleSet
+        from eaccode.tools.base import ToolRegistry
+
+        class FakeClient:
+            def complete(self, req):
+                results.append(req.messages[-1].text)
+                return CompletionResponse(
+                    text="bg done", tool_calls=[], stop_reason="end_turn",
+                    usage=TokenUsage(), model="fake",
+                )
+
+        return AgentLoop(
+            FakeClient(), ToolRegistry(),
+            PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
+            AgentConfig(workdir=workdir, max_turns=3),
+        ), None, None
+
+    tool = DelegateTool()
+    tool.delegate_builder = fake_builder
+    ctx = ToolContext(workdir=tmp_path)
+    result = await tool.run(
+        DelegateInput(goal="background task", background=True), ctx
+    )
+    assert result.is_error is False
+    assert "background" in result.content
+    assert result.metadata.get("delegation_id") == 1
+    # Let the background task finish, then collect.
+    for _ in range(50):
+        if collect_background_results():
+            break
+        await asyncio.sleep(0.01)
+    collected = collect_background_results()
+    assert any("[delegation #1]" in line for line in collected)
+    assert results == ["background task"]
+
+
+@pytest.mark.asyncio
+async def test_background_failure_is_collected(tmp_path):
+    async def broken_builder(workdir, max_turns=15):
+        raise RuntimeError("boom")
+
+    tool = DelegateTool()
+    tool.delegate_builder = broken_builder
+    ctx = ToolContext(workdir=tmp_path)
+    result = await tool.run(
+        DelegateInput(goal="will fail", background=True), ctx
+    )
+    assert result.is_error is False  # the delegation itself succeeded
+    for _ in range(50):
+        if collect_background_results():
+            break
+        await asyncio.sleep(0.01)
+    collected = collect_background_results()
+    assert any("failed" in line for line in collected)
+
+
+def test_cancel_all_background_clears():
+    cancel_all_background()  # must not raise with nothing running
+    assert collect_background_results() == []

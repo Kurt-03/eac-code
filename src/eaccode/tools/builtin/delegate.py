@@ -37,6 +37,50 @@ class DelegateInput(BaseModel):
                     "When set, `goal` is ignored.",
     )
     max_turns: int = Field(default=15, description="Subagent turn budget")
+    background: bool = Field(
+        default=False,
+        description="C.4: run in the background and return immediately. "
+                    "The result is delivered into the next turns as context.",
+    )
+
+
+# C.4: in-process background delegation registry (task_id -> future).
+_background_tasks: dict[int, asyncio.Task] = {}
+_background_results: dict[int, str] = {}
+_background_failures: dict[int, str] = {}
+_next_task_id = 1
+
+
+def background_status() -> dict:
+    """Active/finished counts for the REPL status line."""
+    return {
+        "active": len([t for t in _background_tasks.values() if not t.done()]),
+        "done": len(_background_results),
+        "failed": len(_background_failures),
+    }
+
+
+def active_background_tasks() -> list[int]:
+    return [tid for tid, t in _background_tasks.items() if not t.done()]
+
+
+def collect_background_results() -> list[str]:
+    """Finished background results (consumed once by the loop)."""
+    results: list[str] = []
+    for tid in sorted(_background_results):
+        results.append(f"[delegation #{tid}] {_background_results[tid]}")
+    _background_results.clear()
+    for tid in sorted(_background_failures):
+        results.append(f"[delegation #{tid} failed] {_background_failures[tid]}")
+    _background_failures.clear()
+    return results
+
+
+def cancel_all_background() -> None:
+    for task in _background_tasks.values():
+        if not task.done():
+            task.cancel()
+    _background_tasks.clear()
 
 
 class DelegateTool(Tool):
@@ -45,7 +89,8 @@ class DelegateTool(Tool):
         "Spawn a subagent with an isolated context to work on a focused "
         "subtask. Returns only its final answer. Use for independent "
         "research or implementation pieces. Pass `tasks` as an array to "
-        "run several goals in parallel (batch mode)."
+        "run several goals in parallel (batch mode), or `background` to "
+        "return immediately and get the result in later turns."
     )
     input_model = DelegateInput
     requires_permission = True
@@ -62,8 +107,40 @@ class DelegateTool(Tool):
             )
         if input.tasks:
             return await self._run_batch(builder, input, ctx)
+        if input.background:
+            return await self._run_background(builder, input, ctx)
         return await self._run_single(builder, input.goal, input.context,
                                       input.max_turns, ctx)
+
+    async def _run_background(self, builder, input: DelegateInput,
+                              ctx: ToolContext) -> ToolResult:
+        """C.4: fire-and-forget — the loop collects the result later."""
+        global _next_task_id
+        task_id = _next_task_id
+        _next_task_id += 1
+
+        async def _work() -> None:
+            try:
+                result = await self._run_single(
+                    builder, input.goal, input.context, input.max_turns, ctx
+                )
+                if result.is_error:
+                    _background_failures[task_id] = result.content
+                else:
+                    _background_results[task_id] = result.content
+            except Exception as e:  # pragma: no cover - defensive
+                _background_failures[task_id] = f"{type(e).__name__}: {e}"
+
+        task = asyncio.create_task(_work())
+        _background_tasks[task_id] = task
+        task.add_done_callback(lambda _t: _background_tasks.pop(task_id, None))
+        return ToolResult(
+            content=(
+                f"Delegated #{task_id} in the background — "
+                "the result arrives in a later turn as context."
+            ),
+            metadata={"delegation_id": task_id},
+        )
 
     async def _run_single(self, builder, goal: str, context: str,
                           max_turns: int, ctx: ToolContext) -> ToolResult:

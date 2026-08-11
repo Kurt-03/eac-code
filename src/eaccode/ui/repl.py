@@ -539,6 +539,10 @@ class EaccodeApp(App):
             return
         # P0.10: session_end hook (fire-and-forget — the app is exiting).
         self._run_session_end_hook()
+        # C.4: cancel running background delegations on exit.
+        from eaccode.tools.builtin.delegate import cancel_all_background
+
+        cancel_all_background()
         self.exit()
 
     def _run_session_end_hook(self) -> None:
