@@ -67,16 +67,49 @@ class Settings(BaseModel):
     )
     skills: SkillSettings = SkillSettings()
     curator: CuratorSettings = CuratorSettings()
+    # E.3: CLI-related sections.
+    backup_keep_days: int = Field(default=7, ge=0, description="E.13: keep N daily backups")
+    update_auto_check: bool = Field(default=False, description="E.14: check for updates on start")
 
     @classmethod
     def load(cls, path: Path) -> Settings:
+        """E.4/E.5: load with migrations; a corrupt file falls back to
+        defaults (the broken file is preserved as <name>.broken)."""
         if not path.exists():
             return cls()
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if not isinstance(data, dict):
+                raise ValueError("settings root must be a mapping")
+        except (OSError, ValueError, yaml.YAMLError) as e:
+            broken = path.with_suffix(path.suffix + ".broken")
+            try:
+                path.replace(broken)
+            except OSError:
+                pass
+            cls._warn_fallback(path, broken, e)
+            return cls()
         # B.3/E.4: migrate the renamed permission mode.
         if data.get("permission_mode") == "smart":
             data["permission_mode"] = PermissionMode.SAFE_AUTO.value
-        return cls(**data)
+        # E.4: old `auto_compact_threshold` → `compact_threshold`.
+        if "auto_compact_threshold" in data and "compact_threshold" not in data:
+            data["compact_threshold"] = data.pop("auto_compact_threshold")
+        try:
+            return cls(**data)
+        except Exception as e:
+            cls._warn_fallback(path, None, e)
+            return cls()
+
+    @staticmethod
+    def _warn_fallback(path: Path, broken: Path | None, error: Exception) -> None:
+        import warnings
+
+        note = f" → kept at {broken}" if broken else ""
+        warnings.warn(
+            f"Settings {path} could not be parsed ({error}); using defaults{note}.",
+            stacklevel=2,
+        )
 
     def save(self, path: Path) -> None:
         path.write_text(

@@ -47,6 +47,36 @@ def doctor() -> None:
     mcp_configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
     check(len(mcp_configs) >= 0, f"mcp.yaml ({len(mcp_configs)} server(s) configured)")
 
+    # E.15: extended diagnostics.
+    for dep, purpose in (("trafilatura", "web_extract"),
+                         ("websocket-client", "browser CDP")):
+        try:
+            __import__(dep)
+            check(True, f"{purpose} dep available ({dep})")
+        except ImportError:
+            check(False, f"{purpose} dep missing ({dep} — optional, "
+                         "`eaccode deps` installs)")
+    allowlist = paths.config_dir / "allowlist.json"
+    check(not allowlist.exists() or allowlist.stat().st_size > 2,
+          f"allowlist loadable ({allowlist.name})")
+    try:
+        import sqlite3
+
+        with sqlite3.connect(paths.sessions_dir / "sessions.db"):
+            check(True, "sessions DB openable")
+    except Exception:
+        check(False, "sessions DB openable")
+    hooks = paths.hooks_dir
+    from eaccode.hooks.registry import discover_hooks
+
+    hook_count = sum(len(v) for v in discover_hooks(hooks).values())
+    check(hook_count >= 0, f"hooks dir ({hook_count} script(s))")
+    for p in providers:
+        has_key = bool(p.api_key)
+        has_env = bool(getattr(p, "api_key_env", None))
+        check(has_key or has_env,
+              f"provider {p.name}: key set ({'env' if has_env else 'file' if has_key else 'MISSING'})")
+
     if problems:
         print_info(f"\n{problems} issue(s) found.")
         raise SystemExit(1)

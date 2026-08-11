@@ -307,6 +307,34 @@ def _cmd_title(app, arg: str) -> CommandResult:
     return CommandResult(message=f"Title set: {app._session_title}")
 
 
+def _cmd_hooks(app, arg: str) -> CommandResult:
+    """E.12: /hooks — list hook scripts and their events."""
+    from eaccode.config.paths import EaccodePaths
+    from eaccode.hooks.registry import discover_hooks
+
+    hooks = discover_hooks(EaccodePaths().hooks_dir)
+    if not hooks:
+        return CommandResult(message="No hooks installed (config/hooks/).")
+    lines = []
+    for event in sorted(hooks):
+        for h in hooks[event]:
+            lines.append(f"  {event}: {h}")
+    return CommandResult(message="Hooks:\n" + "\n".join(lines))
+
+
+def _cmd_plugins(app, arg: str) -> CommandResult:
+    """E.8: /plugins — list context-engine plugins."""
+    from eaccode.config.paths import EaccodePaths
+
+    plugin_dir = EaccodePaths().plugins_dir
+    if not plugin_dir.is_dir():
+        return CommandResult(message="No plugins (config/plugins/).")
+    names = sorted(p.name for p in plugin_dir.iterdir() if p.is_dir())
+    if not names:
+        return CommandResult(message="No plugins (config/plugins/).")
+    return CommandResult(message="Plugins:\n" + "\n".join(f"  {n}" for n in names))
+
+
 def _cmd_cost(app, arg: str) -> CommandResult:
     if arg == "reset":
         usage = getattr(app, "_total_usage", None)
@@ -324,7 +352,7 @@ def _cmd_cost(app, arg: str) -> CommandResult:
 
 
 def _cmd_status(app, arg: str) -> CommandResult:
-    """/status — session, model, mode, tokens, cost, workdir (G.1)."""
+    """/status — session, model, mode, tokens, cost, workdir (E.20)."""
     usage = getattr(app, "_total_usage", None)
     if usage is None:
         tokens_in = tokens_out = 0
@@ -339,6 +367,25 @@ def _cmd_status(app, arg: str) -> CommandResult:
         f"Tokens:  {tokens_in + tokens_out} ({tokens_in} in / {tokens_out} out)",
         f"Cost:    ${cost:.4f}",
     ]
+    # E.20: session id, title, background delegations, reviews.
+    session_id = getattr(app, "_session_id", "")
+    if session_id:
+        title = getattr(app, "_session_title", "")
+        lines.append(f"Session: {session_id[:12]}{' — ' + title if title else ''}")
+    try:
+        from eaccode.tools.builtin.delegate import background_status
+
+        bg = background_status()
+        if bg["active"] or bg["done"] or bg["failed"]:
+            lines.append(f"Delegations: {bg['active']} active, "
+                         f"{bg['done']} done, {bg['failed']} failed")
+    except Exception:
+        pass
+    pending = getattr(getattr(app, "_approvals", None), "pending", None)
+    if pending is not None:
+        count = len(pending())
+        if count:
+            lines.append(f"Pending approvals: {count} (/approve list)")
     return CommandResult(message="\n".join(lines))
 
 
@@ -408,6 +455,8 @@ DISPATCH_TABLE: dict[str, object] = {
     "allow": _cmd_allow,
     "disallow": _cmd_disallow,
     "title": _cmd_title,
+    "hooks": _cmd_hooks,
+    "plugins": _cmd_plugins,
     "model": _cmd_model,
     "reasoning": _cmd_reasoning,
     "undo": _cmd_undo,

@@ -86,6 +86,8 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("skills", "List loaded skills (browse/enable/disable)",
                "Tools & Skills", args_hint="[enable|disable <name>]",
                subcommands=("enable", "disable")),
+    CommandDef("hooks", "List hook scripts by event (E.12)", "Tools & Skills"),
+    CommandDef("plugins", "List context-engine plugins (E.8)", "Tools & Skills"),
     CommandDef("compress", "Manually compact context", "Tools & Skills",
                args_hint="[here N]"),
     CommandDef("diff", "Show git diff (staged|all|session)", "Tools & Skills",

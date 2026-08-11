@@ -89,9 +89,11 @@ from eaccode.cli import (  # noqa: E402
     commands_cron,  # noqa: F401
     commands_curator,  # noqa: F401
     commands_mcp,  # noqa: F401
+    commands_ops,  # noqa: F401
     commands_providers,  # noqa: F401
     commands_queue,  # noqa: F401
     commands_sessions,  # noqa: F401
+    commands_setup,  # noqa: F401
     commands_skills,  # noqa: F401
     commands_utility,  # noqa: F401
 )
