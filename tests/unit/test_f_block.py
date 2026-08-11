@@ -36,7 +36,8 @@ def _resolver(reasoning: str):
 
 
 def test_resolver_reasoning_off_sets_extra_body():
-    from eaccode.llm.models import CompletionRequest, Message
+    from eaccode.llm.client import CompletionRequest
+    from eaccode.llm.models import Message
 
     req = CompletionRequest(messages=[Message.user("hi")], max_tokens=10)
     kwargs = _resolver("off")._base_kwargs(req)
@@ -44,7 +45,8 @@ def test_resolver_reasoning_off_sets_extra_body():
 
 
 def test_resolver_reasoning_on_sets_extra_body():
-    from eaccode.llm.models import CompletionRequest, Message
+    from eaccode.llm.client import CompletionRequest
+    from eaccode.llm.models import Message
 
     req = CompletionRequest(messages=[Message.user("hi")], max_tokens=10)
     kwargs = _resolver("on")._base_kwargs(req)
@@ -52,7 +54,8 @@ def test_resolver_reasoning_on_sets_extra_body():
 
 
 def test_resolver_reasoning_auto_leaves_kwargs_alone():
-    from eaccode.llm.models import CompletionRequest, Message
+    from eaccode.llm.client import CompletionRequest
+    from eaccode.llm.models import Message
 
     req = CompletionRequest(messages=[Message.user("hi")], max_tokens=10)
     kwargs = _resolver("auto")._base_kwargs(req)
