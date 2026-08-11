@@ -1,6 +1,7 @@
 """Tests for the background review (C.2) — parsing + whitelisted agent."""
 
 import pytest
+from pydantic import BaseModel
 
 from eaccode.agent.background_review import (
     REVIEW_WHITELIST,
@@ -9,6 +10,8 @@ from eaccode.agent.background_review import (
 )
 from eaccode.agent.loop import AgentConfig, AgentResult
 from eaccode.llm.client import TokenUsage
+from eaccode.llm.models import Message, ToolCall
+from eaccode.tools.base import Tool, ToolRegistry, ToolResult
 
 
 def test_parse_empty():
@@ -129,19 +132,31 @@ async def test_runtime_cwd_flows_into_tool_context(tmp_path):
 
     seen = {}
 
-    class EchoTool:
+    class EchoInput(BaseModel):
+        pass
+
+    class EchoTool(Tool):
         name = "echo_ctx"
         description = "echo"
-        input_model = None
+        input_model = EchoInput
         requires_permission = False
         tool_class = None
+
         async def run(self, input, ctx):
             seen["runtime_cwd"] = ctx.runtime_cwd
-            from eaccode.tools.base import ToolResult
             return ToolResult(content="ok")
 
     class FakeClient:
+        def __init__(self):
+            self.calls = 0
+
         def complete(self, req):
+            self.calls += 1
+            if self.calls > 1:
+                return CompletionResponse(
+                    text="done", tool_calls=[], stop_reason="end_turn",
+                    usage=TokenUsage(), model="fake",
+                )
             return CompletionResponse(
                 text="", tool_calls=[ToolCall(id="1", name="echo_ctx",
                                               arguments={})],
@@ -155,7 +170,7 @@ async def test_runtime_cwd_flows_into_tool_context(tmp_path):
     loop = AgentLoop(
         FakeClient(), reg,
         PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
-        AgentConfig(workdir=tmp_path, runtime_cwd=sub, max_turns=1),
+        AgentConfig(workdir=tmp_path, runtime_cwd=sub, max_turns=2),
     )
     await loop.run([Message.user("go")])
     assert seen["runtime_cwd"] == sub

@@ -106,8 +106,6 @@ class AgentLoop:
             writer_id=self.config.writer_id,
         )
         total_usage = TokenUsage()
-        self._run_usage = total_usage  # F.7: finalizer accumulates here
-
         self.guardrails.reset_for_turn()
         self._memory_used_since_nudge = False
 
@@ -196,16 +194,13 @@ class AgentLoop:
     def _finalize_turn(self, messages: list[Message], assistant_text: str,
                        usage: object, turn: int) -> None:
         """F.7: shared turn completion for run() and run_streaming()."""
-        from eaccode.agent.runtime_helpers import merge_usage
-
         if assistant_text:
             messages.append(Message.assistant(assistant_text))
-        self._run_usage = merge_usage(self._run_usage, usage)
         if self.config.on_turn_complete:
-            try:
+            from contextlib import suppress
+
+            with suppress(Exception):
                 self.config.on_turn_complete(turn, assistant_text or "", usage)
-            except Exception:
-                pass  # callbacks are advisory
 
     def _maybe_memory_nudge(self, turn: int) -> None:
         """A.9: hint once per window when no memory_* tool was used."""
@@ -279,7 +274,6 @@ class AgentLoop:
             writer_id=self.config.writer_id,
         )
         total_usage = TokenUsage()
-        self._run_usage = total_usage  # F.7: finalizer accumulates here
 
         for turn in range(self.config.max_turns):
             # P0.2: auto-compaction (streaming variant).
