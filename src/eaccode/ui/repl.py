@@ -139,6 +139,7 @@ class EaccodeApp(App):
         # only the surrounding Boxen are gone.
         with Vertical():
             yield RichLog(id="log", wrap=True, markup=True, highlight=False)
+            yield Static(id="spinner")  # v0.4.0.2: robust spinner widget
             yield Static(id="overlay")  # Phase C: slash/@ suggestion list
             yield Input(
                 placeholder="›  ask eaccode…  (/ for commands)",
@@ -146,6 +147,9 @@ class EaccodeApp(App):
                 suggester=self._suggester,
             )
             yield Static(id="status")
+            # Focus sink: while a permission is pending we park focus here
+            # (a Static eats no keys), so y/a/n/p bubble to App.on_key.
+            yield Static(id="focus-dummy")
 
     def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
@@ -309,9 +313,13 @@ class EaccodeApp(App):
         diff = self._diff_preview(tool_name, display_args)
         prompt_text = render_permission_prompt(tool_name, display_args, diff)
         log.write(prompt_text)
-        # v0.4.0 fix: disable the Input widget so its key handlers stop
-        # swallowing y/a/n/p. We re-enable it once the future resolves.
-        self.query_one("#input", Input).disabled = True
+        # v0.4.0.2: park focus on the dummy sink so y/a/n/p bubble to
+        # App.on_key (a focused Input would swallow them as text).
+        try:
+            self.query_one("#input", Input).disabled = True
+            self.query_one("#focus-dummy").focus()
+        except Exception:
+            pass
         self._pending_permission = {
             "future": future,
             "tool_name": tool_name,
@@ -324,7 +332,20 @@ class EaccodeApp(App):
         future.add_done_callback(
             lambda f: self._on_approval_resolved(tool_name, arguments, f)
         )
+        # v0.4.0.2: ALWAYS restore the input when the future settles —
+        # including the 600s timeout path in prompts.py, which would
+        # otherwise leave the Input disabled forever ("hängt").
+        future.add_done_callback(self._restore_input_after_permission)
         return future
+
+    def _restore_input_after_permission(self, fut) -> None:
+        """Re-enable + refocus the Input once a permission ask settles."""
+        self._pending_permission = None
+        try:
+            self.query_one("#input", Input).disabled = False
+            self.query_one("#input", Input).focus()
+        except Exception:
+            pass
 
     def _diff_preview(self, tool_name: str, arguments: dict) -> str | None:
         """Best-effort unified-diff for write/edit calls (Phase B.2)."""
@@ -376,12 +397,8 @@ class EaccodeApp(App):
             "p": PermissionChoice.PAUSE,
         }
         future.set_result(mapping[choice])
-        self._pending_permission = None
-        # Re-enable the input widget that was disabled in _ask_permission_async.
-        try:
-            self.query_one("#input", Input).disabled = False
-        except Exception:
-            pass
+        # _pending_permission + input restore happen in the done_callback
+        # (_restore_input_after_permission) — keep this method minimal.
         self.query_one("#log", RichLog).write(f"  → {choice}")
 
     def on_key(self, event) -> None:
@@ -432,9 +449,11 @@ class EaccodeApp(App):
         self._stream_text = ""
         self._reasoning_text = ""
         self._tool_starts: dict[str, float] = {}
-        # v0.4.0 (Phase A): spinner writes a single line into the Log that
-        # gets replaced on every tick (no separate #stream Static).
-        self._spinner_line_idx = log.write("  ⠋")
+        # v0.4.0.2: spinner lives in its own Static widget (robust — no
+        # RichLog internals). Show it; hide via _hide_spinner.
+        spinner_widget = self.query_one("#spinner", Static)
+        spinner_widget.update("  ⠋")
+        self._spinner_line_idx = None
         # C.4: single-writer fence — a new turn supersedes this stream.
         # claim_stream_writer stores the token on self (P0.6 Bug 1 fix).
         from eaccode.llm.stream_fence import claim_stream_writer, fence_delta
@@ -456,12 +475,12 @@ class EaccodeApp(App):
             if self._spinner_interval is not None:
                 self._spinner_interval.stop()
                 self._spinner_interval = None
-            if self._spinner_line_idx is not None:
-                try:
-                    log.lines.pop(self._spinner_line_idx)
-                except Exception:
-                    pass
-                self._spinner_line_idx = None
+            # v0.4.0.2: clear the spinner Static (no RichLog internals).
+            try:
+                self.query_one("#spinner", Static).update("")
+            except Exception:
+                pass
+            self._spinner_line_idx = None
 
         def on_text(delta: str) -> None:
             if fence_delta(self, writer_token, delta) is None:
@@ -739,20 +758,15 @@ class EaccodeApp(App):
         return spinner.frame()
 
     def _tick_spinner(self) -> None:
-        """v0.4.0 (Phase A.2): replace the spinner line in the Log."""
+        """v0.4.0.2: update the spinner Static (robust, no Log internals)."""
         from eaccode.tui.spinner import Spinner as _Spinner
 
-        if not self._busy or self._spinner_line_idx is None:
+        if not self._busy:
             return
         self._spinner = getattr(self, "_spinner", _Spinner(interval=0.125))
         self._spinner.tick()
         try:
-            log = self.query_one("#log", RichLog)
-            if self._spinner_line_idx < len(log.lines):
-                log.lines[self._spinner_line_idx]._renderable = (
-                    f"  {self._spinner.frame()}"
-                )
-                log.refresh()
+            self.query_one("#spinner", Static).update(f"  {self._spinner.frame()}")
         except Exception:
             pass
 
