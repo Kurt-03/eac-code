@@ -638,9 +638,9 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 | Task | Status | Commit / Notiz |
 |---|---|---|
 | A.1 skill_utils (Frontmatter/Platform) | ✅ | `9ec6f07` |
-| A.2 Skill-Manager 5+ Actions | 🔄 | — |
+| A.2 Skill-Manager 5+ Actions | ✅ | `1b988b1` |
 | A.3 Skill-Provenance + Usage-Backend | ✅ | `9ec6f07` |
-| A.4 Skill-Linter | ⬜ | — |
+| A.4 Skill-Linter | 🔄 | — |
 | A.5 skill_preprocessing (Template-Vars) | ⬜ | — |
 | A.6 Skill-Triggers + Pre-Filter | ⬜ | — |
 | A.7 skills_config | ⬜ | — |
