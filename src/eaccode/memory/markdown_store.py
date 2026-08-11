@@ -123,6 +123,26 @@ class MarkdownMemoryStore:
                        project_hash)
         return replaced
 
+    def trim(self, kind: str, project_hash: str | None = None) -> int:
+        """A.12: drop oldest fact lines until the content fits the budget.
+
+        Header lines (starting with ``#``) are protected. Returns the
+        number of removed lines (0 when already within budget).
+        """
+        current = self.read(kind, project_hash)
+        budget = _BUDGETS[kind]
+        if len(current) <= budget:
+            return 0
+        lines = [ln for ln in current.splitlines() if ln.strip()]
+        headers = [ln for ln in lines if ln.startswith("#")]
+        body = [ln for ln in lines if not ln.startswith("#")]
+        removed = 0
+        while body and len("\n".join([*headers, *body])) > budget:
+            body.pop(0)  # oldest first
+            removed += 1
+        self.write(kind, "\n".join([*headers, *body]) + "\n", project_hash)
+        return removed
+
     # ------------------------------------------------------ first run
 
     def ensure_first_run(self) -> None:

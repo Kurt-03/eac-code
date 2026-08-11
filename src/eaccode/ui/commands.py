@@ -204,6 +204,12 @@ def _cmd_memory(app, arg: str) -> CommandResult:
     # P0.3: /memory shows the markdown memory files (and JSONL facts).
     store = _md_memory(app)
     hash_ = _md_project_hash(app)
+    # A.12: /memory trim drops the oldest facts until the budget fits.
+    if arg.strip() == "trim":
+        removed = store.trim("memory", hash_)
+        if removed == 0:
+            return CommandResult(message="Memory is within budget — nothing to trim.")
+        return CommandResult(message=f"Trimmed {removed} fact(s). /memory shows the rest.")
     blocks: list[str] = []
     memory_md = store.read("memory", hash_)
     user_md = store.read("user")

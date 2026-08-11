@@ -5,6 +5,7 @@ import pytest
 from eaccode.memory.markdown_store import (
     MEMORY_BUDGET,
     SOUL_BUDGET,
+    USER_BUDGET,
     BudgetExceededError,
     MarkdownMemoryStore,
 )
@@ -73,6 +74,35 @@ class TestStore:
         soul = store.read("soul")
         assert "Working Style" in soul
         assert "direct and honest" in soul  # A.8 template body
+
+    def test_trim_drops_oldest_facts_until_budget(self, tmp_path):
+        # The file is over budget because it was edited externally —
+        # the budget guard only applies to store writes.
+        store = MarkdownMemoryStore(tmp_path)
+        store.add_fact("memory", "old fact 1", "h1")
+        store.add_fact("memory", "old fact 2", "h1")
+        path = store._path("memory", "h1")
+        path.write_text(
+            path.read_text(encoding="utf-8") + "- " + "x" * (MEMORY_BUDGET + 200),
+            encoding="utf-8",
+        )
+        removed = store.trim("memory", "h1")
+        assert removed >= 2
+        text = store.read("memory", "h1")
+        assert len(text) <= MEMORY_BUDGET
+        assert "old fact 1" not in text  # oldest went first
+
+    def test_trim_protects_headers(self, tmp_path):
+        store = MarkdownMemoryStore(tmp_path)
+        store.write("user", "# User Profile\n\n- " + "y" * (USER_BUDGET + 100))
+        removed = store.trim("user")
+        assert removed >= 1
+        assert store.read("user").startswith("# User Profile")
+
+    def test_trim_within_budget_is_noop(self, tmp_path):
+        store = MarkdownMemoryStore(tmp_path)
+        store.add_fact("memory", "small", "h1")
+        assert store.trim("memory", "h1") == 0
 
 
 class TestTools:

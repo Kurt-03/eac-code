@@ -645,10 +645,10 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 | A.6 Skill-Triggers + Pre-Filter | ✅ | `86eac5f` |
 | A.7 skills_config | ✅ | `02febf6` |
 | A.8 default_soul | ✅ | `02febf6` |
-| A.9 Memory-Auto-Nudge | 🔄 | — |
-| A.10 memory_provider-Base | 🔄 | — |
-| A.11 Lokale Skill-Bundles | ⬜ | — |
-| A.12 mem_trim | ⬜ | — |
+| A.9 Memory-Auto-Nudge | ✅ | `2d50807` |
+| A.10 memory_provider-Base | ✅ | `2d50807` |
+| A.11 Lokale Skill-Bundles | 🔄 | — |
+| A.12 mem_trim | 🔄 | — |
 | A.13 Lokale Skills-Sammlung | ⬜ | — |
 
 ### Phase B — safeAuto + Approval
