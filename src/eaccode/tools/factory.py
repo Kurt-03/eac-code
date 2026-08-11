@@ -26,13 +26,14 @@ TOOLSETS: dict[str, set[str]] = {
     "cronjob": {"cronjob"},
     "vision": {"vision_analyze", "video_analyze"},
     "browser": {"browser"},
+    "computer_use": {"computer_use", "computer_use_capture"},
 }
 
 # Default-on toolsets (everything except niche/opt-in ones).
 DEFAULT_TOOLSETS: set[str] = {
     "web", "terminal", "file", "code_execution", "skills", "todo",
     "memory", "session_search", "clarify", "delegation", "cronjob",
-    "vision", "browser",
+    "vision", "browser", "computer_use",
 }
 
 
@@ -43,6 +44,10 @@ def _all_tools() -> list[Tool]:
     from eaccode.tools.builtin.bash import BashTool
     from eaccode.tools.builtin.browser import BrowserTool
     from eaccode.tools.builtin.clarify import ClarifyTool
+    from eaccode.tools.builtin.computer_use import (
+        ComputerUseCaptureTool,
+        ComputerUseTool,
+    )
     from eaccode.tools.builtin.cronjob import CronjobTool
     from eaccode.tools.builtin.delegate import DelegateTool
     from eaccode.tools.builtin.edit import EditTool
@@ -76,6 +81,8 @@ def _all_tools() -> list[Tool]:
         VisionAnalyzeTool(),
         VideoAnalyzeTool(),
         BrowserTool(),
+        ComputerUseTool(),
+        ComputerUseCaptureTool(),
         # Phase I.12: plugin-registered runtime tools (context engine).
         *get_engine(EaccodePaths().plugins_dir).build_tools(),
     ]

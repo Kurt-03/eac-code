@@ -84,6 +84,7 @@ def paths() -> None:
 # Sub-command registration (import side effects register on `main`) —
 # these must run after `main` is defined, hence the late imports
 from eaccode.cli import (  # noqa: E402
+    commands_computer,  # noqa: F401
     commands_config,  # noqa: F401
     commands_cron,  # noqa: F401
     commands_curator,  # noqa: F401
