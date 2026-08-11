@@ -137,6 +137,41 @@ def test_cron_store_no_agent_roundtrip(tmp_path):
     assert store.get("j3").no_agent is False
 
 
+# ---------------------------------------------------------------- G.7
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_fires_periodically():
+    import asyncio
+
+    from eaccode.agent.heartbeat import Heartbeat
+
+    beats = []
+    heartbeat = Heartbeat(0.05, lambda: beats.append(1))
+    heartbeat.start()
+    try:
+        await asyncio.sleep(0.18)
+    finally:
+        heartbeat.stop()
+    assert len(beats) >= 2
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_stop_halts():
+    import asyncio
+
+    from eaccode.agent.heartbeat import Heartbeat
+
+    beats = []
+    heartbeat = Heartbeat(0.02, lambda: beats.append(1))
+    heartbeat.start()
+    await asyncio.sleep(0.08)
+    heartbeat.stop()
+    count = len(beats)
+    await asyncio.sleep(0.08)
+    assert len(beats) == count  # no beats after stop
+
+
 def test_cron_store_migration_adds_no_agent(tmp_path):
     import sqlite3
 
