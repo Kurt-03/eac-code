@@ -1,44 +1,29 @@
-"""`eaccode skills` sub-commands (A.11) — bundle install + listing."""
+"""`eaccode skills bundle` sub-commands (A.11) — bundle install + listing.
+
+Extends the existing ``skills`` group (defined in commands_utility) with
+a ``bundle`` sub-command; ``skills list`` stays in commands_utility.
+"""
+
+from pathlib import Path
 
 import click
 
 from eaccode.cli._output import print_info, print_warn
+from eaccode.cli.commands_utility import skills
 from eaccode.config.paths import EaccodePaths
 from eaccode.memory.skill_bundles import install_bundle, scan_bundles
-from eaccode.memory.skill_linter import lint_skills_dir
 
 
-@click.group(name="skills")
-def skills_group() -> None:
-    """Manage skills and skill bundles."""
-
-
-@skills_group.command("list")
-def skills_list() -> None:
-    """List installed skills (with lint status)."""
-    paths = EaccodePaths()
-    from eaccode.memory.skills import discover_skills
-
-    skills = discover_skills([paths.skills_dir])
-    if not skills:
-        print_info("No skills installed yet.")
-        return
-    lint = lint_skills_dir(paths.skills_dir)
-    for s in skills:
-        status = "✓" if str(s.source) not in lint else f"✗ ({len(lint[str(s.source)])} lint)"
-        print_info(f"- {s.name}: {s.description} [{s.provenance}] {status}")
-
-
-@skills_group.command("bundle")
+@skills.command("bundle")
 @click.argument("action", type=click.Choice(["list", "install"]))
 @click.argument("name", required=False)
 def skills_bundle(action: str, name: str | None) -> None:
     """List or install local skill bundles."""
     paths = EaccodePaths()
+    package_bundles = Path(__file__).resolve().parent.parent / "bundles"
     bundles_dirs = [
-        paths.config_dir / "bundles",
-        # Bundles shipped with the package (if the repo layout is present).
-        paths.config_dir.parent / "src" / "eaccode" / "bundles",
+        paths.config_dir / "bundles",  # user-managed
+        package_bundles,               # shipped with the package
     ]
     if action == "list":
         bundles = scan_bundles(bundles_dirs)
