@@ -19,7 +19,8 @@ TOOLSETS: dict[str, set[str]] = {
     "code_execution": {"execute_code"},
     "skills": {"skill_create", "skill_patch", "skill_list"},
     "todo": {"todo_write"},
-    "memory": {"memory_remember", "memory_recall", "memory_forget"},
+    "memory": {"memory_remember", "memory_recall", "memory_forget",
+               "memory_edit"},
     "session_search": {"session_search"},
     "clarify": {"clarify"},
     "delegation": {"delegate_task"},
@@ -40,6 +41,12 @@ DEFAULT_TOOLSETS: set[str] = {
 def _all_tools() -> list[Tool]:
     from eaccode.config.paths import EaccodePaths
     from eaccode.context.engine import get_engine
+    from eaccode.memory.memory_tools import (
+        MemoryEditTool,
+        MemoryForgetTool,
+        MemoryRecallTool,
+        MemoryRememberTool,
+    )
     from eaccode.memory.skill_tools import SkillCreateTool, SkillListTool, SkillPatchTool
     from eaccode.tools.builtin.bash import BashTool
     from eaccode.tools.builtin.browser import BrowserTool
@@ -74,6 +81,10 @@ def _all_tools() -> list[Tool]:
         ClarifyTool(),
         ExecuteCodeTool(),
         DelegateTool(),
+        MemoryRememberTool(),
+        MemoryRecallTool(),
+        MemoryForgetTool(),
+        MemoryEditTool(),
         CronjobTool(store_path=EaccodePaths().cron_db),
         SearchFilesTool(),
         WebExtractTool(),

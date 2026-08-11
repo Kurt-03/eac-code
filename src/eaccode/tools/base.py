@@ -36,6 +36,8 @@ class ToolContext(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     permission_mode: str = "default"
     skills_dir: Path = Field(default_factory=Path)
+    # P0.3: markdown memory dir (None → tools fall back to EaccodePaths).
+    memory_dir: Path | None = None
     config: Any = None
 
 

@@ -201,16 +201,38 @@ def _cmd_verbose(app, arg: str) -> CommandResult:
 
 
 def _cmd_memory(app, arg: str) -> CommandResult:
+    # P0.3: /memory shows the markdown memory files (and JSONL facts).
+    store = _md_memory(app)
+    hash_ = _md_project_hash(app)
+    blocks: list[str] = []
+    memory_md = store.read("memory", hash_)
+    user_md = store.read("user")
+    soul_md = store.read("soul")
+    if memory_md.strip():
+        blocks.append(f"MEMORY.md:\n{memory_md.rstrip()}")
+    if user_md.strip():
+        blocks.append(f"USER.md:\n{user_md.rstrip()}")
+    if soul_md.strip():
+        blocks.append(f"SOUL.md:\n{soul_md.rstrip()}")
     facts = _get_memory(app)
-    if not facts:
-        return CommandResult(message="No learned facts for this project yet.")
-    return CommandResult(message="\n".join(f"- {f}" for f in facts))
+    if facts:
+        blocks.append("Learned facts:\n" + "\n".join(f"- {f}" for f in facts))
+    if not blocks:
+        return CommandResult(
+            message="No memory yet. /remember <text> saves a project fact."
+        )
+    return CommandResult(message="\n\n".join(blocks))
 
 
 def _cmd_remember(app, arg: str) -> CommandResult:
     if not arg:
         return CommandResult(message="Usage: /remember <text>")
-    _save_memory(app, arg)
+    from eaccode.memory.markdown_store import BudgetExceededError
+
+    try:
+        _save_memory(app, arg)
+    except BudgetExceededError as e:
+        return CommandResult(message=str(e))
     return CommandResult(message=f"Remembered: {arg}")
 
 
@@ -376,9 +398,29 @@ def _plugin_handler(plugin_fn):
 
 
 # ---------------------------------------------------------------------------
-# Memory helpers — sync (MemoryStore ops are plain file IO; asyncio.run from
-# inside Textual's running loop raises RuntimeError, Phase A.6).
+# Memory helpers — sync (file IO; asyncio.run from inside Textual's running
+# loop raises RuntimeError, Phase A.6). P0.3: /remember and /forget operate
+# on the user-facing MEMORY.md (markdown store); /memory shows all files.
 # ---------------------------------------------------------------------------
+
+def _md_memory(app):
+    """MarkdownMemoryStore bound to the app (lazily created)."""
+    store = getattr(app, "_md_memory", None)
+    if store is None:
+        from eaccode.config.paths import EaccodePaths
+        from eaccode.memory.markdown_store import MarkdownMemoryStore
+
+        store = MarkdownMemoryStore(EaccodePaths().memory_dir)
+        store.ensure_first_run()
+        app._md_memory = store
+    return store
+
+
+def _md_project_hash(app) -> str:
+    from eaccode.memory.store import MemoryStore
+
+    return MemoryStore.project_hash(app.workdir)
+
 
 def _get_memory(app) -> list[str]:
     if hasattr(app, "memory_facts") and app.memory_facts:
@@ -392,16 +434,10 @@ def _get_memory(app) -> list[str]:
 
 
 def _save_memory(app, text: str) -> None:
-    store = getattr(app, "memory_store", None)
-    if store is not None:
-        project_hash_fn = getattr(type(app), "project_hash", None)
-        if project_hash_fn is not None:
-            store.remember_sync(project_hash_fn(app.workdir), text, source="user")
+    # P0.3: /remember writes into the project MEMORY.md (with budget).
+    _md_memory(app).add_fact("memory", text, _md_project_hash(app))
 
 
 def _forget_memory(app, text: str) -> None:
-    store = getattr(app, "memory_store", None)
-    if store is not None:
-        project_hash_fn = getattr(type(app), "project_hash", None)
-        if project_hash_fn is not None:
-            store.forget_sync(project_hash_fn(app.workdir), text)
+    # P0.3: /forget removes the matching line from MEMORY.md.
+    _md_memory(app).remove_line("memory", text, _md_project_hash(app))

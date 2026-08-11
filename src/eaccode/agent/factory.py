@@ -41,6 +41,7 @@ def build_system_context(
     skills_dirs: list[Path] | None = None,
     memory: MemoryStore | None = None,
     ignore_rules: bool = False,
+    markdown_memory_dir: Path | None = None,
 ) -> SystemContext:
     """Compose the system prompt (sync — for CLI contexts without a loop)."""
     import asyncio
@@ -51,6 +52,7 @@ def build_system_context(
             skills_dirs=skills_dirs,
             memory=memory,
             ignore_rules=ignore_rules,
+            markdown_memory_dir=markdown_memory_dir,
         )
     )
 
@@ -61,6 +63,7 @@ async def build_system_context_async(
     skills_dirs: list[Path] | None = None,
     memory: MemoryStore | None = None,
     ignore_rules: bool = False,
+    markdown_memory_dir: Path | None = None,
 ) -> SystemContext:
     """Compose the system prompt from project rules + memory + skills.
 
@@ -71,6 +74,9 @@ async def build_system_context_async(
     memory_facts: list[str] = []
     if memory is not None and not ignore_rules:
         memory_facts = await memory.recall(MemoryStore.project_hash(workdir))
+    # P0.3: markdown memory files (MEMORY.md / USER.md / SOUL.md) are
+    # injected as their own sections, next to the JSONL facts.
+    md_memory_section = _markdown_memory_section(workdir, markdown_memory_dir)
     skills = ""
     if skills_dirs and not ignore_rules:
         loaded = discover_skills(skills_dirs)
@@ -86,7 +92,7 @@ async def build_system_context_async(
     workspace_block = "" if ignore_rules else build_coding_workspace_block(workdir)
     key = (
         str(workdir), project_rules, tuple(memory_facts), skills, ignore_rules,
-        workspace_block,
+        workspace_block, md_memory_section,
     )
     cached = _prompt_cache.get(key)
     if cached is not None:
@@ -94,6 +100,7 @@ async def build_system_context_async(
     prompt = build_system_prompt(
         project_rules=project_rules,
         memory_facts=memory_facts,
+        md_memory_section=md_memory_section,
         skills=skills,
         workdir=str(workdir),
         workspace_block=workspace_block,
@@ -103,6 +110,29 @@ async def build_system_context_async(
         _prompt_cache.clear()
     _prompt_cache[key] = ctx
     return ctx
+
+
+def _markdown_memory_section(workdir: Path,
+                             memory_dir: Path | None) -> str:
+    """P0.3: render MEMORY.md / USER.md / SOUL.md as prompt sections."""
+    if memory_dir is None:
+        return ""
+    from eaccode.memory.markdown_store import MarkdownMemoryStore
+    from eaccode.memory.store import MemoryStore
+
+    store = MarkdownMemoryStore(memory_dir)
+    project_hash = MemoryStore.project_hash(workdir)
+    sections: list[str] = []
+    memory_text = store.read("memory", project_hash)
+    if memory_text.strip():
+        sections.append(f"# Project Memory\n{memory_text.strip()}")
+    user_text = store.read("user")
+    if user_text.strip():
+        sections.append(f"# User Profile\n{user_text.strip()}")
+    soul_text = store.read("soul")
+    if soul_text.strip():
+        sections.append(f"# Working Style\n{soul_text.strip()}")
+    return "\n\n".join(sections)
 
 
 def build_agent(
@@ -183,11 +213,16 @@ async def build_agent_async(
     policy = PolicyEngine(mode=mode or settings.permission_mode, rules=RuleSet())
 
     memory = MemoryStore(paths.memory_dir)
+    # P0.3: first-run setup of USER.md/SOUL.md (+ MEMORY.md dirs on demand).
+    from eaccode.memory.markdown_store import MarkdownMemoryStore
+
+    MarkdownMemoryStore(paths.memory_dir).ensure_first_run()
     sysctx = await build_system_context_async(
         workdir,
         skills_dirs=[paths.skills_dir],
         memory=memory,
         ignore_rules=settings.ignore_rules,
+        markdown_memory_dir=paths.memory_dir,
     )
     agent = AgentLoop(
         client,
