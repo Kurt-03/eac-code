@@ -20,6 +20,7 @@ htmlcov/
 # Hermes workspace artifacts
 # plans/ is project documentation (tracked); archive/ stays local
 .hermes/archive/
+.hermes/plans/archive/
 
 # OS
 .DS_Store

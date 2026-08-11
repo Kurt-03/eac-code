@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from eaccode.memory.skills import discover_skills
 from eaccode.memory.skill_usage import record_view
+from eaccode.memory.skills import discover_skills
 from eaccode.tools.base import Tool, ToolContext, ToolResult
 
 
