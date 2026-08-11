@@ -23,6 +23,7 @@ from textual.widgets import Footer, Header, Input, RichLog, Static
 from eaccode.llm.client import TokenUsage
 from eaccode.llm.models import ToolCall
 from eaccode.memory.store import MemoryStore
+from eaccode.sessions.store import SessionStore  # D.2: session persistence
 from eaccode.tools.base import ToolResult
 from eaccode.ui.commands import handle_command
 from eaccode.ui.suggester import SlashCommandSuggester
@@ -106,6 +107,12 @@ class EaccodeApp(App):
 
         _settings = Settings.load(EaccodePaths().settings_file)
         self._review_scheduler = ReviewScheduler(_settings.review_every_turns)
+        # D.2/D.6: session persistence — id, store, save on exit.
+        self._session_id: str = ""
+        self._session_title: str = ""
+        self._session_lock: Path | None = None
+        self._session_store: SessionStore | None = None
+        self._save_sessions = _settings.save_sessions
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
 
@@ -192,6 +199,8 @@ class EaccodeApp(App):
         # P0.9: wire the persistent allowlist into the policy engine.
         agent.policy.allowlist = self._allowlist
         self.memory_facts = sysctx.memory_facts
+        # D.2/D.6/D.8: start the persisted session (id + lease).
+        self._start_session(paths_cls)
         if mcp_tools:
             log.write(f"[dim]mcp: {len(mcp_tools)} external tool(s) loaded[/dim]")
         if sysctx.memory_facts:
@@ -412,6 +421,16 @@ class EaccodeApp(App):
         # C.1: background review when the turn window is reached.
         if self._review_scheduler.should_review(result.turns):
             self.run_worker(self._run_review_worker(log), exclusive=False)
+        # D.2: persist the conversation (provenance-aware title).
+        if self._session_title == "":
+            from eaccode.sessions.titles import derive_title
+
+            first_user = next(
+                (m["content"] for m in self.messages
+                 if m.get("role") == "user" and m.get("content")), ""
+            )
+            self._session_title = derive_title(first_user)
+        self._save_session()
         # Status bar (Phase B.2): model · mode · tokens · cost · ctx%
         self._total_usage += result.usage
         ctx_pct = self._context_pct()
@@ -485,6 +504,73 @@ class EaccodeApp(App):
             log.write("[dim]review: skill suggestions (not applied): "
                       + "; ".join(result.skills) + "[/dim]")
 
+    def _start_session(self, paths_cls) -> None:
+        """D.2/D.6/D.8: create session id, store, lease (idempotent)."""
+        if self._session_id:
+            return
+        import uuid
+
+        paths = paths_cls()
+        self._session_id = str(uuid.uuid4())
+        self._session_store = SessionStore(paths.sessions_dir / "sessions.db")
+        from eaccode.sessions.leases import acquire_lease, cleanup_stale_leases
+
+        cleanup_stale_leases(paths.sessions_dir)  # crashed-session cleanup
+        self._session_lock = acquire_lease(paths.sessions_dir, self._session_id)
+
+    def _save_session(self, upgrade_title: bool = False) -> None:
+        """D.2/D.6: persist messages + metadata (provenance-aware title)."""
+        if not self._save_sessions or self._session_store is None:
+            return
+        if not self.messages:
+            return
+        import asyncio
+
+        from eaccode.llm.models import Message as LlmMessage
+
+        msgs = []
+        for m in self.messages:
+            if m.get("role") in ("user", "assistant") and m.get("content"):
+                msgs.append(LlmMessage.user(m["content"])
+                            if m["role"] == "user"
+                            else LlmMessage.assistant(m["content"]))
+        if not msgs:
+            return
+        title = self._session_title or ""
+        provenance = "user" if self._session_title else "derived"
+        metadata = {
+            "cwd": str(self.workdir),
+            "provider": self._model_name or "",
+            "model": self._model_name or "",
+        }
+        try:
+            asyncio.get_running_loop()
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None and loop.is_running():
+            self._save_task = asyncio.create_task(  # noqa: RUF006 (fire-and-forget)
+                self._session_store.save(
+                    title, msgs, metadata,
+                    session_id=self._session_id, provenance=provenance,
+                )
+            )
+        else:  # pragma: no cover - headless contexts
+            asyncio.run(
+                self._session_store.save(
+                    title, msgs, metadata,
+                    session_id=self._session_id, provenance=provenance,
+                )
+            )
+
+    def _release_session(self) -> None:
+        """D.8: drop the lease + final save on exit."""
+        if self._session_lock is not None:
+            from eaccode.sessions.leases import release_lease
+
+            release_lease(self._session_lock)
+            self._session_lock = None
+
     def _md_memory_dir(self):
         """Memory dir used by the review worker (matches commands.py)."""
         from eaccode.config.paths import EaccodePaths
@@ -543,6 +629,9 @@ class EaccodeApp(App):
         from eaccode.tools.builtin.delegate import cancel_all_background
 
         cancel_all_background()
+        # D.2/D.8: final save + lease release.
+        self._save_session()
+        self._release_session()
         self.exit()
 
     def _run_session_end_hook(self) -> None:

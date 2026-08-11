@@ -294,6 +294,19 @@ def _cmd_forget(app, arg: str) -> CommandResult:
     return CommandResult(message=f"Forgot: {arg}")
 
 
+def _cmd_title(app, arg: str) -> CommandResult:
+    """D.1: /title <text> — set a user-provenance session title."""
+    if not arg:
+        current = getattr(app, "_session_title", "") or "(none)"
+        return CommandResult(message=f"Session title: {current}")
+    app._session_title = arg.strip()[:60]
+    # Persist with user provenance (wins over derived/llm).
+    save = getattr(app, "_save_session", None)
+    if save is not None:
+        save()
+    return CommandResult(message=f"Title set: {app._session_title}")
+
+
 def _cmd_cost(app, arg: str) -> CommandResult:
     if arg == "reset":
         usage = getattr(app, "_total_usage", None)
@@ -394,6 +407,7 @@ DISPATCH_TABLE: dict[str, object] = {
     "deny": _cmd_deny,
     "allow": _cmd_allow,
     "disallow": _cmd_disallow,
+    "title": _cmd_title,
     "model": _cmd_model,
     "reasoning": _cmd_reasoning,
     "undo": _cmd_undo,

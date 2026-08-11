@@ -65,20 +65,49 @@ class SessionStore:
         messages: list[Message],
         metadata: dict[str, Any] | None = None,
         session_id: str | None = None,
+        provenance: str = "derived",
     ) -> str:
         sid = session_id or str(uuid.uuid4())
         now = datetime.now().isoformat()
-        # Provenance (Phase G.6): a user-given title must survive — only
-        # auto-generated ("untitled"-derived) titles get refreshed on save.
-        if not title or title == "untitled":
+        # D.1/D.2: provenance-aware title update (user > llm > derived).
+        # A user-given title always survives; an LLM title only replaces
+        # a derived one; derived never overwrites anything.
+        from eaccode.sessions.titles import should_upgrade
+
+        existing: tuple[str, str] | None = None
+        if session_id:
             with sqlite3.connect(self.db_path) as _conn:
-                existing = _conn.execute(
-                    "SELECT title FROM sessions WHERE id = ?", (sid,)
+                row = _conn.execute(
+                    "SELECT title, metadata FROM sessions WHERE id = ?", (sid,)
                 ).fetchone()
-            if existing and existing[0] not in ("untitled",):
-                title = existing[0]  # keep the user's title
+                if row:
+                    existing = (row[0], row[1] or "{}")
+        if not title or title == "untitled":
+            if existing and existing[0] and existing[0] != "untitled":
+                # Never clobber an existing title with a derived one.
+                title = existing[0]
+                try:
+                    provenance = json.loads(existing[1]).get(
+                        "_title_provenance", "derived"
+                    )
+                except ValueError:
+                    provenance = "derived"
             else:
                 title = generate_title(messages)
+                provenance = "derived"
+        elif existing:
+            old_title, old_meta_json = existing
+            try:
+                old_prov = json.loads(old_meta_json).get(
+                    "_title_provenance", "derived"
+                )
+            except ValueError:
+                old_prov = "derived"
+            if old_title and not should_upgrade(old_prov, provenance):
+                title = old_title
+                provenance = old_prov
+        meta = dict(metadata or {})
+        meta["_title_provenance"] = provenance
         # Redact credential-like strings before anything hits disk (Phase A.2)
         from eaccode.security.redact import redact_secrets
 
@@ -88,7 +117,7 @@ class SessionStore:
             for m in messages
         ]
         msgs_json = json.dumps([m.model_dump(mode="json") for m in msgs])
-        meta_json = json.dumps(metadata or {})
+        meta_json = json.dumps(meta)
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO sessions (id, title, messages, metadata, created_at, updated_at) "
@@ -114,6 +143,7 @@ class SessionStore:
             )
 
     async def load(self, session_id: str) -> Session:
+        """Load one session; raises KeyError when missing."""
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
@@ -121,6 +151,13 @@ class SessionStore:
         if not row:
             raise KeyError(session_id)
         return self._row_to_session(row)
+
+    async def get(self, session_id: str) -> Session | None:
+        """Load one session; None when missing (D.3/D.5 convenience)."""
+        try:
+            return await self.load(session_id)
+        except KeyError:
+            return None
 
     async def list_sessions(self, limit: int = 20) -> list[Session]:
         with sqlite3.connect(self.db_path) as conn:

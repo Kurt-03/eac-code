@@ -47,6 +47,8 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("rollback", "List file checkpoints; restore one with an index",
                "Session", args_hint="[N]"),
     CommandDef("clear", "Clear conversation history", "Session"),
+    CommandDef("title", "Set a user session title (D.1)",
+               "Session", args_hint="<text>"),
     CommandDef("status", "Show session, model, tokens, ctx%, workdir",
                "Session"),
     # ── Configuration ────────────────────────────────────────────────────
