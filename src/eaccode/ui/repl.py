@@ -328,7 +328,7 @@ class EaccodeApp(App):
         if tool_name not in ("write", "edit"):
             return None
         try:
-            from eaccode.ui.permission_modal import build_unified_diff
+            from eaccode.ui.permission_diff import build_unified_diff
 
             path_str = arguments.get("path", "")
             if not path_str:

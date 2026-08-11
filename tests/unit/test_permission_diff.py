@@ -11,8 +11,7 @@ from eaccode.permissions.prompts import (
     prompt_for_permission_async,
 )
 from eaccode.permissions.rules import Action, Rule
-from eaccode.ui.permission_modal import (
-    PermissionModal,
+from eaccode.ui.permission_diff import (
     build_unified_diff,
     diff_for_write,
 )
@@ -166,13 +165,9 @@ class TestDiffPreview:
         inverted direction (old/new were swapped before the fix)."""
         path = tmp_path / "f.py"
         path.write_text("old line\nunchanged\n", encoding="utf-8")
-        modal = PermissionModal(
-            "edit",
-            {"path": str(path), "old_string": "old line",
-             "new_string": "new line"},
-            question="Allow edit?",
-        )
-        diff = modal._diff_preview()
+        # v0.4.0: PermissionModal removed — verify the diff helper directly.
+        diff = build_unified_diff("old line\nunchanged\n",
+                                  "new line\nunchanged\n", str(path))
         assert diff is not None
         assert "-old line" in diff
         assert "+new line" in diff
