@@ -74,6 +74,7 @@ def _all_tools() -> list[Tool]:
     from eaccode.tools.builtin.todo import TodoWriteTool
     from eaccode.tools.builtin.vision import VideoAnalyzeTool, VisionAnalyzeTool
     from eaccode.tools.builtin.web_extract import WebExtractTool
+    from eaccode.tools.builtin.web_search import WebSearchTool
     from eaccode.tools.builtin.write import WriteTool
 
     return [
@@ -99,6 +100,7 @@ def _all_tools() -> list[Tool]:
         CronjobTool(store_path=EaccodePaths().cron_db),
         SearchFilesTool(),
         WebExtractTool(),
+        WebSearchTool(),  # G.6
         ProcessTool(),
         VisionAnalyzeTool(),
         VideoAnalyzeTool(),

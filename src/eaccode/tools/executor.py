@@ -67,3 +67,26 @@ class ToolExecutor:
         if result.content:
             result.content = cap_output(strip_ansi(result.content))
         return result
+
+    async def execute_parallel(
+        self,
+        tasks: list[tuple[str, dict]],
+        workdir: Path,
+        *,
+        ctx: ToolContext | None = None,
+    ) -> list[ToolResult]:
+        """G.8: dispatch independent tool calls concurrently.
+
+        Failures are captured per call (one broken tool does not drop the
+        others). The permission gate is NOT applied here — callers decide
+        beforehand (the loop stays sequential by default because its
+        permission modal flow is single-ask at a time).
+        """
+        import asyncio
+
+        return list(
+            await asyncio.gather(
+                *(self.execute(name, args, workdir, ctx=ctx)
+                  for name, args in tasks)
+            )
+        )

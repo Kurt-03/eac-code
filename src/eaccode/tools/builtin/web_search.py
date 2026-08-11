@@ -1,82 +1,49 @@
-"""WebSearch tool (Task 3.6) — key-based providers with graceful degradation.
+"""web_search tool (G.6) — keyless search via the provider registry."""
 
-Provider chain: SERPER_API_KEY (Serper.dev) → BRAVE_API_KEY → clear error.
-No key = helpful message telling the user how to enable search.
-"""
 from __future__ import annotations
 
-import os
-
-import httpx
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.web_search_registry import available_providers, search
 
 
 class WebSearchInput(BaseModel):
     query: str = Field(description="Search query")
-    top_n: int = Field(default=8, description="Max results to return")
+    limit: int = Field(default=5, ge=1, le=10, description="Max results")
+    provider: str = Field(default="ddg", description="Search provider name")
 
 
 class WebSearchTool(Tool):
     name = "web_search"
-    tool_class = ToolClass.RUNAWAY
-    description = "Search the web. Returns titles, URLs, and snippets."
+    description = (
+        "Search the web (keyless DuckDuckGo by default). Returns "
+        "title/url/snippet rows. Use when the answer needs current "
+        "public information."
+    )
     input_model = WebSearchInput
     requires_permission = False
+    tool_class = None
 
     async def run(self, input: WebSearchInput, ctx: ToolContext) -> ToolResult:
-        serper = os.environ.get("SERPER_API_KEY")
-        brave = os.environ.get("BRAVE_API_KEY")
-        if serper:
-            return await self._serper(input, serper)
-        if brave:
-            return await self._brave(input, brave)
-        return ToolResult(
-            content="Web search is not configured. Set SERPER_API_KEY "
-            "(https://serper.dev) or BRAVE_API_KEY in the environment, "
-            "or use web_fetch with a known URL.",
-            is_error=True,
-        )
-
-    async def _serper(self, input: WebSearchInput, key: str) -> ToolResult:
-        try:
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(
-                    "https://google.serper.dev/search",
-                    headers={"X-API-KEY": key, "Content-Type": "application/json"},
-                    json={"q": input.query, "num": input.top_n},
-                )
-        except Exception as e:
-            return ToolResult(content=f"Search error: {e}", is_error=True)
-        if resp.status_code != 200:
-            return ToolResult(content=f"Search error: HTTP {resp.status_code}", is_error=True)
-        results = resp.json().get("organic", [])
-        return self._format(results)
-
-    async def _brave(self, input: WebSearchInput, key: str) -> ToolResult:
-        try:
-            with httpx.Client(timeout=30) as client:
-                resp = client.get(
-                    "https://api.search.brave.com/res/v1/web/search",
-                    headers={"X-Subscription-Token": key, "Accept": "application/json"},
-                    params={"q": input.query, "count": input.top_n},
-                )
-        except Exception as e:
-            return ToolResult(content=f"Search error: {e}", is_error=True)
-        if resp.status_code != 200:
-            return ToolResult(content=f"Search error: HTTP {resp.status_code}", is_error=True)
-        results = resp.json().get("web", {}).get("results", [])
-        return self._format(results)
-
-    @staticmethod
-    def _format(results: list[dict]) -> ToolResult:
+        if input.provider not in available_providers():
+            return ToolResult(
+                content=f"Unknown provider {input.provider!r}. "
+                        f"Available: {', '.join(available_providers())}",
+                is_error=True,
+            )
+        results = search(input.query, input.limit, input.provider)
         if not results:
-            return ToolResult(content="No results found.")
-        lines = []
-        for r in results[:10]:
-            title = r.get("title", "")
-            link = r.get("link") or r.get("url", "")
-            snippet = r.get("snippet", "") or r.get("description", "")
-            lines.append(f"{title}\n  {link}\n  {snippet}")
-        return ToolResult(content="\n\n".join(lines))
+            return ToolResult(
+                content=f"No results for {input.query!r} (provider "
+                        f"{input.provider}).",
+                is_error=False,
+            )
+        lines = [f"Search results for {input.query!r} "
+                 f"({len(results)} via {input.provider}):"]
+        for i, r in enumerate(results, 1):
+            lines.append(f"{i}. {r.title}")
+            lines.append(f"   {r.url}")
+            if r.snippet:
+                lines.append(f"   {r.snippet[:200]}")
+        return ToolResult(content="\n".join(lines))
