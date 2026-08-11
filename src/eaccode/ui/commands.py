@@ -229,6 +229,12 @@ def _cmd_rollback(app, arg: str) -> CommandResult:
 
 
 def _cmd_clear(app, arg: str) -> CommandResult:
+    """J.44: /clear — wipe history (with confirm)."""
+    if arg != "--yes":
+        return CommandResult(
+            message="This wipes the conversation history. Confirm with "
+                    "/clear --yes"
+        )
     app.messages = []
     return CommandResult(message="Conversation cleared.")
 
@@ -335,12 +341,69 @@ def _cmd_plugins(app, arg: str) -> CommandResult:
     return CommandResult(message="Plugins:\n" + "\n".join(f"  {n}" for n in names))
 
 
+def _cmd_tips(app, arg: str) -> CommandResult:
+    """J.31: /tips — a rotating tip."""
+    import random
+
+    tips = [
+        "Use @file:path to inject a file into the prompt.",
+        "/mode safeAuto auto-approves classified-safe bash.",
+        "/compress frees context; /context shows the breakdown.",
+        "3x approval of the same tool suggests /allow.",
+        "Esc cancels a running agent; /approve <id> resolves asks.",
+        "@git:5 injects the last 5 commits with stats.",
+        "Background reviews propose memory facts — /approve saves them.",
+        "/memory trim drops the oldest facts over budget.",
+    ]
+    return CommandResult(message=random.choice(tips))
+
+
+def _cmd_focus(app, arg: str) -> CommandResult:
+    """J.34: /focus — refocus the input (e.g. after mouse clicks)."""
+    try:
+        from textual.widgets import Input
+
+        app.query_one(Input).focus()
+        return CommandResult(message="Input focused.")
+    except Exception:
+        return CommandResult(message="Input not available.")
+
+
+def _cmd_debug(app, arg: str) -> CommandResult:
+    """J.2: /debug — stream diagnostics (fence events, scrubber stats)."""
+    from eaccode.llm.stream_fence import fence_stats
+
+    lines = ["Stream diagnostics:"]
+    stats = fence_stats()
+    for key, value in stats.items():
+        lines.append(f"  {key}: {value}")
+    reasoning_txt = getattr(app, "_reasoning_text", "") or ""
+    if reasoning_txt:
+        lines.append(f"  last reasoning chars: {len(reasoning_txt)}")
+    return CommandResult(message="\n".join(lines))
+
+
+def _cmd_clear(app, arg: str) -> CommandResult:
+    """J.44: /clear — wipe history (with confirm)."""
+    if arg != "--yes":
+        return CommandResult(
+            message="This wipes the conversation history. Confirm with "
+                    "/clear --yes"
+        )
+    app.messages.clear()
+    return CommandResult(message="Conversation cleared.")
+
+
 def _cmd_cost(app, arg: str) -> CommandResult:
+    """/cost — total spend, with per-model breakdown (J.6)."""
     if arg == "reset":
         usage = getattr(app, "_total_usage", None)
         if usage is not None:
             usage.__class__()
             app._total_usage = usage.__class__()
+        by_model = getattr(app, "_usage_by_model", None)
+        if by_model is not None:
+            by_model.clear()
         return CommandResult(message="Usage counter reset.")
     usage = getattr(app, "last_usage", None)
     if usage:
@@ -348,6 +411,13 @@ def _cmd_cost(app, arg: str) -> CommandResult:
             message=f"Last run: {usage.input_tokens} in / {usage.output_tokens} out, "
             f"${usage.cost_usd:.4f}"
         )
+    by_model = getattr(app, "_usage_by_model", None)
+    if by_model:
+        lines = ["Spend by model:"]
+        for model, u in sorted(by_model.items()):
+            lines.append(f"  {model}: {u.input_tokens + u.output_tokens} tok "
+                         f"(${u.cost_usd:.4f})")
+        return CommandResult(message="\n".join(lines))
     return CommandResult(message="No usage yet.")
 
 
@@ -504,6 +574,9 @@ DISPATCH_TABLE: dict[str, object] = {
     "retry": _cmd_retry,
     "rollback": _cmd_rollback,
     "clear": _cmd_clear,
+    "tips": _cmd_tips,
+    "focus": _cmd_focus,
+    "debug": _cmd_debug,
     "copy": _cmd_copy,
     "verbose": _cmd_verbose,
     "memory": _cmd_memory,

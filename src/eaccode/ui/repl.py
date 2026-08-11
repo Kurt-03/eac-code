@@ -90,6 +90,7 @@ class EaccodeApp(App):
         self._mode_name = ""
         self._show_reasoning = False
         self._total_usage = TokenUsage()
+        self._usage_by_model: dict[str, TokenUsage] = {}  # J.6: per-model
         self._install_plugin_commands()
         # P0.9: persistent allowlist + per-pattern approval counters.
         from eaccode.permissions.allowlist import AllowlistStore
@@ -215,10 +216,17 @@ class EaccodeApp(App):
                 log.write(f"[dim]  • {f}[/dim]")
         log.write("\n[dim]Ready. Ask away — the agent has read, write, bash, "
                   "grep, web, todo, and skill tools.[/dim]\n")
+        # J.4: onboarding hints for fresh sessions (first run of the app).
+        if not self.messages and not getattr(self, "_onboarding_done", False):
+            self._onboarding_done = True
+            log.write("[dim]Hints: /help lists commands · @file:path injects "
+                      "files · /mode safeAuto auto-approves safe bash[/dim]")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         log = self.query_one("#log", RichLog)
-        text = event.value.strip()
+        # J.35: input sanitization — strip control characters, trim.
+        text = "".join(ch for ch in event.value if ch >= " " or ch == "\t")
+        text = text.strip()
         if not text:
             return
         event.input.value = ""
@@ -444,6 +452,12 @@ class EaccodeApp(App):
         self._save_session()
         # Status bar (Phase B.2): model · mode · tokens · cost · ctx%
         self._total_usage += result.usage
+        # J.6: per-model spend breakdown (/cost).
+        model_key = self._model_name or "default"
+        per_model = self._usage_by_model.setdefault(model_key, TokenUsage())
+        per_model.input_tokens += result.usage.input_tokens
+        per_model.output_tokens += result.usage.output_tokens
+        per_model.cost_usd += result.usage.cost_usd
         ctx_pct = self._context_pct()
         ctx_txt = f" · {ctx_pct}%" if ctx_pct is not None else ""
         self.sub_title = (

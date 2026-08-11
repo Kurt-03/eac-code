@@ -18,6 +18,13 @@ from typing import Any
 
 _token_counter = itertools.count(1)
 _lock = threading.Lock()
+_stats = {"claimed": 0, "dropped": 0}  # J.2: diagnostics
+
+
+def fence_stats() -> dict:
+    """J.2: stream-fence counters for /debug."""
+    with _lock:
+        return dict(_stats)
 
 
 def claim_stream_writer(owner: Any) -> int:
@@ -29,6 +36,7 @@ def claim_stream_writer(owner: Any) -> int:
     """
     with _lock:
         token = next(_token_counter)
+        _stats["claimed"] += 1
     owner._stream_writer_token = token
     return token
 
@@ -54,4 +62,6 @@ def fence_delta(owner: Any, token: int, delta: Any) -> Any | None:
     """
     if stream_writer_is_current(owner, token):
         return delta
+    with _lock:
+        _stats["dropped"] += 1
     return None
