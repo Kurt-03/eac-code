@@ -1,5 +1,7 @@
 """Tests for skill preprocessing (A.5) — template vars + inline shell."""
 
+from pathlib import Path
+
 from eaccode.memory.skill_preprocessing import (
     preprocess_skill,
     run_inline_shell,
