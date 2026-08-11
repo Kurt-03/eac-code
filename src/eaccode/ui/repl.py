@@ -549,7 +549,7 @@ class EaccodeApp(App):
         except RuntimeError:
             loop = None
         if loop is not None and loop.is_running():
-            self._save_task = asyncio.create_task(  # noqa: RUF006 (fire-and-forget)
+            self._save_task = asyncio.create_task(
                 self._session_store.save(
                     title, msgs, metadata,
                     session_id=self._session_id, provenance=provenance,

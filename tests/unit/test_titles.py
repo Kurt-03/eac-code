@@ -41,7 +41,7 @@ async def test_llm_title_failure_returns_none(monkeypatch):
 @pytest.mark.asyncio
 async def test_llm_title_success(monkeypatch):
     class _Resp:
-        choices = [type("C", (), {"message": type("M", (), {"content": '"Fix build"'})})]
+        choices = (type("C", (), {"message": type("M", (), {"content": '"Fix build"'})}),)
 
     async def _fake(**kwargs):
         return _Resp()
