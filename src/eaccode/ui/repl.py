@@ -28,6 +28,27 @@ from eaccode.ui.commands import handle_command
 from eaccode.ui.suggester import SlashCommandSuggester
 
 
+class PermissionAwareInput(Input):
+    """Input that hands y/a/n/p/Esc to the app while a permission is pending.
+
+    ``Input._on_key`` stops printable keys and inserts them as text, which
+    is exactly why bare ``App.on_key`` never saw the permission letters
+    (v0.4.0.x regression). This subclass checks the app's pending ask
+    first and resolves it instead of inserting the character.
+    """
+
+    def _on_key(self, event) -> None:
+        app = self.app
+        if getattr(app, "_pending_permission", None):
+            key = event.key.lower()
+            if key in ("y", "a", "n", "p", "escape"):
+                app._resolve_pending_permission("n" if key == "escape" else key)
+                event.stop()
+                event.prevent_default()
+                return
+        super()._on_key(event)
+
+
 class EaccodeApp(App):
     TITLE = "eaccode"
     SUB_TITLE = ""
@@ -141,15 +162,12 @@ class EaccodeApp(App):
             yield RichLog(id="log", wrap=True, markup=True, highlight=False)
             yield Static(id="spinner")  # v0.4.0.2: robust spinner widget
             yield Static(id="overlay")  # Phase C: slash/@ suggestion list
-            yield Input(
+            yield PermissionAwareInput(
                 placeholder="›  ask eaccode…  (/ for commands)",
                 id="input",
                 suggester=self._suggester,
             )
             yield Static(id="status")
-            # Focus sink: while a permission is pending we park focus here
-            # (a Static eats no keys), so y/a/n/p bubble to App.on_key.
-            yield Static(id="focus-dummy")
 
     def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
@@ -313,13 +331,8 @@ class EaccodeApp(App):
         diff = self._diff_preview(tool_name, display_args)
         prompt_text = render_permission_prompt(tool_name, display_args, diff)
         log.write(prompt_text)
-        # v0.4.0.2: park focus on the dummy sink so y/a/n/p bubble to
-        # App.on_key (a focused Input would swallow them as text).
-        try:
-            self.query_one("#input", Input).disabled = True
-            self.query_one("#focus-dummy").focus()
-        except Exception:
-            pass
+        # v0.4.0.3: the PermissionAwareInput subclass intercepts y/a/n/p/Esc
+        # while a permission is pending — no runtime bindings needed.
         self._pending_permission = {
             "future": future,
             "tool_name": tool_name,
@@ -339,7 +352,7 @@ class EaccodeApp(App):
         return future
 
     def _restore_input_after_permission(self, fut) -> None:
-        """Re-enable + refocus the Input once a permission ask settles."""
+        """Clean up after a permission ask settles: re-enable + refocus."""
         self._pending_permission = None
         try:
             self.query_one("#input", Input).disabled = False
@@ -402,7 +415,9 @@ class EaccodeApp(App):
         self.query_one("#log", RichLog).write(f"  → {choice}")
 
     def on_key(self, event) -> None:
-        """v0.4.0 (Phase B): route y/a/n/p/Esc to the pending permission."""
+        """Fallback for environments where runtime bindings are unavailable:
+        route y/a/n/p/Esc to the pending permission (kept as belt-and-
+        suspenders; the primary path is the priority bindings)."""
         if not getattr(self, "_pending_permission", None):
             return
         key = event.key.lower()
@@ -418,8 +433,8 @@ class EaccodeApp(App):
 
         try:
             choice = future.result()
-        except Exception:
-            return
+        except (Exception, asyncio.CancelledError):
+            return  # cancelled/timed-out asks are not approvals
         if choice not in (PermissionChoice.ALLOW_ONCE, PermissionChoice.ALLOW_ALWAYS):
             return
         pattern = suggest_pattern(tool_name, arguments)
