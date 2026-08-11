@@ -119,6 +119,10 @@ class EaccodeApp(App):
         self._estop_flag = asyncio.Event()
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
+        # v0.4.0 (Phase C): suggestion overlay below the input.
+        from eaccode.tui.overlay import SuggestionOverlay
+
+        self._overlay = SuggestionOverlay()
 
     def _install_plugin_commands(self) -> None:
         """Phase I.12: wire context-engine plugin slash commands before the
@@ -135,6 +139,7 @@ class EaccodeApp(App):
         # only the surrounding Boxen are gone.
         with Vertical():
             yield RichLog(id="log", wrap=True, markup=True, highlight=False)
+            yield Static(id="overlay")  # Phase C: slash/@ suggestion list
             yield Input(
                 placeholder="›  ask eaccode…  (/ for commands)",
                 id="input",
@@ -221,6 +226,24 @@ class EaccodeApp(App):
             self._onboarding_done = True
             log.write("[dim]Hints: /help lists commands · @file:path injects "
                       "files · /mode safeAuto auto-approves safe bash[/dim]")
+
+    def on_input_changed(self, event) -> None:
+        """v0.4.0 (Phase C): update the suggestion overlay."""
+        from eaccode.tui.suggester_list import (
+            list_at_completions,
+            list_slash_completions,
+        )
+
+        text = event.value
+        overlay = self.query_one("#overlay", Static)
+        if text.startswith("/"):
+            self._overlay.set_items(list_slash_completions(text))
+        elif text.startswith("@"):
+            self._overlay.set_items(list_at_completions(text))
+        else:
+            self._overlay.set_items([])
+        lines = self._overlay.render_lines()
+        overlay.update("\n".join(lines) if lines else "")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         log = self.query_one("#log", RichLog)
