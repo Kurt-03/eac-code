@@ -64,7 +64,7 @@ async def _start_turn(app):
     app._busy = True
     app.messages.append({"role": "user", "content": "schreibe out.txt"})
     task = asyncio.create_task(
-        app._run_agent_streaming(app.query_one("#log"))
+        app._run_agent_streaming(app.query_one("#transcript"))
     )
     return task
 
