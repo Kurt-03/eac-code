@@ -7,6 +7,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from eaccode.memory.skills import discover_skills
+from eaccode.memory.skill_usage import record_view
 from eaccode.tools.base import Tool, ToolContext, ToolResult
 
 
@@ -90,5 +91,8 @@ class SkillListTool(Tool):
         skills = discover_skills([ctx.skills_dir])
         if not skills:
             return ToolResult(content="No skills installed yet.")
+        # P0.4: listing counts as a view (curator signal).
+        for s in skills:
+            record_view(s.source)
         lines = [f"- {s.name}: {s.description}" for s in skills]
         return ToolResult(content="\n".join(lines))

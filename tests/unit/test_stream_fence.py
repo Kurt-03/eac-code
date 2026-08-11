@@ -1,4 +1,4 @@
-"""Tests for the stream single-writer fence (Phase C.4)."""
+"""Tests for the stream single-writer fence (Phase C.4 + P0.6 Bug 1)."""
 
 from eaccode.llm.stream_fence import (
     claim_stream_writer,
@@ -19,10 +19,17 @@ def test_claim_returns_increasing_tokens():
     assert t1 != t2
 
 
+def test_claim_stores_token_on_owner():
+    """The claim itself must persist the token on the owner (P0.6 Bug 1) —
+    callers who forget to store it still get a working fence."""
+    o = FakeOwner()
+    token = claim_stream_writer(o)
+    assert o._stream_writer_token == token
+
+
 def test_current_writer_passes_deltas():
     o = FakeOwner()
     token = claim_stream_writer(o)
-    o._stream_writer_token = token
     assert stream_writer_is_current(o, token) is True
     assert fence_delta(o, token, "hello") == "hello"
 
@@ -32,7 +39,7 @@ def test_stale_writer_drops_deltas():
     old_token = claim_stream_writer(o)
     # A new turn claims the writer, bumping the token.
     new_token = claim_stream_writer(o)
-    o._stream_writer_token = new_token
+    assert new_token != old_token
     assert stream_writer_is_current(o, old_token) is False
     assert fence_delta(o, old_token, "stale chunk") is None
 

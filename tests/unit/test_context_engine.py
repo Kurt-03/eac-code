@@ -152,6 +152,40 @@ def setup(api):
         result = await tool.run(tool.input_model(n=7), ctx)
         assert result.content == "{'n': 7}"
 
+    def test_list_str_parameter_is_supported(self, tmp_path):
+        """P0.6: `list[str]` is a valid plugin parameter type (generic
+        element type normalized to the pydantic list[str])."""
+        _write_plugin(
+            tmp_path,
+            "p",
+            """
+def setup(api):
+    api.register_tool("tags", "list tool", lambda a, c: ",".join(a["items"]),
+                      parameters={"items": (list[str], "tag list")})
+""",
+        )
+        tool = PluginTool(get_engine(tmp_path).tool_specs()[0])
+        schema = tool.to_schema()["input_schema"]["properties"]
+        assert schema["items"]["type"] == "array"
+
+    def test_unsupported_parameter_type_is_rejected(self, tmp_path):
+        """P0.6: an unsupported parameter type fails the plugin load with a
+        clear error instead of a cryptic create_model crash."""
+        _write_plugin(
+            tmp_path,
+            "p",
+            """
+def setup(api):
+    api.register_tool("bad", "bad tool", lambda a, c: "x",
+                      parameters={"cfg": (dict, "config")})
+""",
+        )
+        engine = ContextEngine(tmp_path)
+        engine.load()
+        assert engine._loaded == []
+        assert len(engine.errors()) == 1
+        assert "unsupported parameter type" in engine.errors()[0][1]
+
 
 class TestSlashIntegration:
     def test_install_plugin_commands_wires_dispatch(self, tmp_path):

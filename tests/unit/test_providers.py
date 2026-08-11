@@ -36,3 +36,20 @@ def test_save_and_load_roundtrip(tmp_path):
 
 def test_load_missing_file_returns_empty(tmp_path):
     assert load_providers(tmp_path / "nope.yaml") == []
+
+
+def test_save_restricts_permissions(tmp_path):
+    """P0.6 Bug 4: save_providers must chmod 600 the secrets file itself,
+    regardless of which code path saved it."""
+    import os
+
+    providers = [
+        ProviderConfig(name="anthropic", api_key="sk-secret", model="claude-sonnet-4-6"),
+    ]
+    file = tmp_path / "providers.yaml"
+    save_providers(providers, file)
+    if os.name != "nt":
+        assert (file.stat().st_mode & 0o777) == 0o600
+    else:
+        # Windows: chmod is a no-op; the file must at least exist with content.
+        assert "sk-secret" in file.read_text(encoding="utf-8")

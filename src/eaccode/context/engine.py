@@ -22,6 +22,7 @@ from typing import Any
 from pydantic import BaseModel, Field, create_model
 
 from eaccode.context.plugin_api import (
+    PARAM_TYPES,
     PluginAPI,
     PluginSlashSpec,
     PluginToolSpec,
@@ -31,15 +32,6 @@ from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 logger = logging.getLogger(__name__)
 
 _ENGINES: dict[str, ContextEngine] = {}
-
-# Allowed parameter types for plugin tools (name -> pydantic type).
-_PARAM_TYPES: dict[type, type] = {
-    str: str,
-    int: int,
-    float: float,
-    bool: bool,
-    list: list[str],
-}
 
 
 class PluginTool(Tool):
@@ -53,7 +45,7 @@ class PluginTool(Tool):
         self.description = spec.description
         self.requires_permission = spec.requires_permission
         fields = {
-            fname: (ftype, Field(description=fdesc))
+            fname: (PARAM_TYPES[ftype], Field(description=fdesc))
             for fname, (ftype, fdesc) in spec.parameters.items()
         }
         self.input_model = create_model(

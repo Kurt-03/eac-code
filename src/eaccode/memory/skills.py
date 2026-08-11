@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from eaccode.memory.skill_usage import last_used_ts
+
 
 @dataclass
 class Skill:
@@ -40,13 +42,21 @@ def discover_skills(paths: list[Path]) -> list[Skill]:
                 meta, body = _parse_frontmatter(f.read_text(encoding="utf-8"))
             except Exception:
                 continue
+            # Real usage signal (P0.4) beats the mtime fallback: mtime is
+            # the last *edit*, not the last *use*.
+            ts = last_used_ts(f)
+            last_used = (
+                datetime.fromtimestamp(ts)
+                if ts is not None
+                else datetime.fromtimestamp(f.stat().st_mtime)
+            )
             skills.append(
                 Skill(
                     name=meta.get("name") or f.stem,
                     description=meta.get("description", ""),
                     content=body,
                     source=f,
-                    last_used=datetime.fromtimestamp(f.stat().st_mtime),
+                    last_used=last_used,
                 )
             )
     return skills

@@ -11,7 +11,11 @@ from eaccode.permissions.prompts import (
     prompt_for_permission_async,
 )
 from eaccode.permissions.rules import Action, Rule
-from eaccode.ui.permission_modal import build_unified_diff, diff_for_write
+from eaccode.ui.permission_modal import (
+    PermissionModal,
+    build_unified_diff,
+    diff_for_write,
+)
 
 
 class TestPermissionPrompt:
@@ -121,3 +125,20 @@ class TestDiffPreview:
         diff = diff_for_write(path, content, max_lines=10)
         assert diff is not None
         assert "more lines" in diff
+
+    def test_edit_diff_shows_correct_direction(self, tmp_path):
+        """P0.6 Bug 2: the edit preview must render current→edited, not the
+        inverted direction (old/new were swapped before the fix)."""
+        path = tmp_path / "f.py"
+        path.write_text("old line\nunchanged\n", encoding="utf-8")
+        modal = PermissionModal(
+            "edit",
+            {"path": str(path), "old_string": "old line",
+             "new_string": "new line"},
+            question="Allow edit?",
+        )
+        diff = modal._diff_preview()
+        assert diff is not None
+        assert "-old line" in diff
+        assert "+new line" in diff
+        assert "unchanged" in diff

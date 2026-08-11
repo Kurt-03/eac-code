@@ -47,6 +47,23 @@ def test_client_simple_completion(mock_completion, tmp_path):
     assert resp.stop_reason == "stop"
 
 
+def test_providers_yaml_overrides_stale_env(monkeypatch, tmp_path):
+    """P0.6 Bug 5: a stale shell env var must not silently shadow the
+    configured providers.yaml key — the config wins."""
+    import os
+
+    from eaccode.config.providers import ProviderConfig, save_providers
+
+    file = tmp_path / "p.yaml"
+    save_providers(
+        [ProviderConfig(name="minimax", api_key="sk-from-yaml", model="MiniMax-M2")],
+        file,
+    )
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-stale-env")
+    LLMClient(default_model="MiniMax-M2", providers_file=file, provider_name="minimax")
+    assert os.environ["MINIMAX_API_KEY"] == "sk-from-yaml"
+
+
 def test_client_tool_call_parsing(monkeypatch, tmp_path):
     import litellm
 

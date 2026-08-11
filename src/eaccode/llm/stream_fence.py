@@ -23,11 +23,14 @@ _lock = threading.Lock()
 def claim_stream_writer(owner: Any) -> int:
     """Claim the delta sink for the calling stream attempt.
 
-    Returns a monotonically increasing writer token. A new claim always
-    supersedes older ones.
+    Stores the token on *owner* (``_stream_writer_token``), so a newer
+    claim supersedes older writers even if the caller never stores the
+    return value. Returns the monotonically increasing writer token.
     """
     with _lock:
-        return next(_token_counter)
+        token = next(_token_counter)
+    owner._stream_writer_token = token
+    return token
 
 
 def stream_writer_is_current(owner: Any, token: int) -> bool:

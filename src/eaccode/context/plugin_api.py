@@ -26,6 +26,20 @@ from eaccode.tools.base import ToolResult
 ToolHandler = Callable[..., ToolResult | str | Awaitable[ToolResult | str]]
 SlashHandler = Callable[[str], str]
 
+# Parameter types a plugin may declare (python type -> pydantic type).
+# ``list`` and ``list[str]`` both map to list[str] (the only supported
+# generic element type).
+PARAM_TYPES: dict[type, type] = {
+    str: str,
+    int: int,
+    float: float,
+    bool: bool,
+    list: list[str],
+    list[str]: list[str],
+}
+
+SUPPORTED_PARAM_TYPES = "str, int, float, bool, list[str]"
+
 
 @dataclass
 class PluginToolSpec:
@@ -73,6 +87,12 @@ class PluginAPI:
         """
         if not name or not name.isidentifier():
             raise ValueError(f"Plugin {self.plugin_name}: invalid tool name {name!r}")
+        for pname, (ptype, _pdesc) in (parameters or {}).items():
+            if ptype not in PARAM_TYPES:
+                raise ValueError(
+                    f"Plugin {self.plugin_name}: unsupported parameter type "
+                    f"{ptype!r} for {name!r}.{pname} — use {SUPPORTED_PARAM_TYPES}"
+                )
         self.tools.append(
             PluginToolSpec(
                 name=name,

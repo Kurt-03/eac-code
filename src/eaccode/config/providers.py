@@ -5,6 +5,7 @@ SecretStr (no key ever appears in plaintext in logs or Pydantic dumps).
 """
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Literal
 
@@ -74,11 +75,15 @@ def save_providers(providers: list[ProviderConfig], path: Path) -> None:
             "api_key": p.api_key.get_secret_value(),
             "model": p.model,
             "base_url": p.base_url,
-            **({"extra": p.extra} if p.extra else {}),
+            **( {"extra": p.extra} if p.extra else {}),
         }
         for p in providers
     ]
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    # Keys are secrets: the file must never be world-readable, no matter
+    # which code path saved it (P0.6 Bug 4 — centralize the chmod 600).
+    with contextlib.suppress(OSError):
+        path.chmod(0o600)
 
 
 def load_providers(path: Path) -> list[ProviderConfig]:

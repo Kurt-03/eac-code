@@ -20,12 +20,17 @@ from eaccode.tools.base import ToolResult
 # Content-block type per media kind (LiteLLM OpenAI-style message format).
 _BLOCK_TYPE = {"image": "image_url", "video": "video_url"}
 
+# Local media larger than this is rejected before read_bytes — a 500 MB
+# video must not be base64-encoded into the prompt in full (P0.6 Bug 3).
+MAX_MEDIA_BYTES = 25 * 1024 * 1024
+
 
 def resolve_media(source: str, workdir: Path | None) -> str | None:
     """Return a provider-compatible URL (http/https/data:) for a media source.
 
     Local paths are read and base64-encoded as data URLs (MIME guessed from
-    the file name). Returns None when the file cannot be read.
+    the file name). Returns None when the file cannot be read or exceeds
+    :data:`MAX_MEDIA_BYTES`.
     """
     if source.startswith(("http://", "https://", "data:")):
         return source
@@ -35,6 +40,8 @@ def resolve_media(source: str, workdir: Path | None) -> str | None:
             return None
         path = workdir / path
     try:
+        if path.stat().st_size > MAX_MEDIA_BYTES:
+            return None
         data = path.read_bytes()
     except OSError:
         return None

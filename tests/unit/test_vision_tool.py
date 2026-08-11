@@ -50,6 +50,15 @@ class TestResolveMedia:
         out = resolve_media("clip.mp4", tmp_path)
         assert out.startswith("data:video/mp4;base64,")
 
+    def test_oversized_file_returns_none(self, tmp_path, monkeypatch):
+        """P0.6 Bug 3: huge local media must not be slurped into RAM/base64."""
+        from eaccode.llm import aux_vision
+
+        monkeypatch.setattr(aux_vision, "MAX_MEDIA_BYTES", 10)
+        big = tmp_path / "big.mp4"
+        big.write_bytes(b"x" * 100)
+        assert resolve_media("big.mp4", tmp_path) is None
+
     def test_no_workdir_and_relative_path_returns_none(self):
         assert resolve_media("x.png", None) is None
 

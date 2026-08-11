@@ -235,9 +235,10 @@ class EaccodeApp(App):
         self._reasoning_text = ""
         self._tool_starts: dict[str, float] = {}
         # C.4: single-writer fence — a new turn supersedes this stream.
+        # claim_stream_writer stores the token on self (P0.6 Bug 1 fix).
         from eaccode.llm.stream_fence import claim_stream_writer, fence_delta
 
-        self._stream_writer_token = claim_stream_writer(self)
+        claim_stream_writer(self)
         writer_token = self._stream_writer_token
         # B.4: animated spinner while the agent works (Braille cycle).
         self._spinner_idx = 0

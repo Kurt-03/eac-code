@@ -13,6 +13,7 @@ Provider-specific details (prefix, keys, base URLs) come from providers.yaml.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,8 @@ from eaccode.llm._stream import ReasoningDelta, StreamUsage, _StreamMixin
 from eaccode.llm.errors import RetryPolicy, classify_api_error
 from eaccode.llm.model_switch import FallbackChain
 from eaccode.llm.models import Message, ToolCall
+
+logger = logging.getLogger(__name__)
 
 # Re-exported for back-compat (existing `from eaccode.llm.client import X`
 # call sites must keep working after the split).
@@ -102,7 +105,15 @@ class LLMClient(_ResolveMixin, _StreamMixin):
         self.providers = {p.name: p for p in load_providers(providers_file)}
         for p in self.providers.values():
             for k, v in p.to_env().items():
-                os.environ.setdefault(k, v)
+                # providers.yaml is the source of truth (P0.6 Bug 5): a
+                # stale shell env var must not silently shadow the
+                # configured key. Overrides are logged for transparency.
+                previous = os.environ.get(k)
+                os.environ[k] = v
+                if previous is not None and previous != v:
+                    logger.debug(
+                        "Overriding env %s from providers.yaml (was set externally)", k
+                    )
         litellm.telemetry = False
         litellm.drop_params = True  # silently ignore unknown params (e.g. thinking)
         # DI seam for the streaming producer (see _stream.py:_produce).

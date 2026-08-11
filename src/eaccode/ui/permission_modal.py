@@ -120,8 +120,8 @@ class PermissionModal(ModalScreen):
             if path.exists():
                 text = path.read_text(encoding="utf-8", errors="replace")
                 diff = build_unified_diff(
+                    text,  # current file content = the "old" side
                     text.replace(old_string, new_string, 1) if old_string else text,
-                    text,
                     str(path),
                 )
             else:

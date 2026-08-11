@@ -16,6 +16,7 @@ from eaccode.config.settings import PermissionMode, Settings
 from eaccode.llm.client import LLMClient
 from eaccode.memory.project import discover_project_context
 from eaccode.memory.skills import discover_skills, skills_to_system_prompt_section
+from eaccode.memory.skill_usage import record_use
 from eaccode.memory.store import MemoryStore
 from eaccode.permissions.policy import PolicyEngine
 from eaccode.permissions.rules import RuleSet
@@ -72,7 +73,12 @@ async def build_system_context_async(
         memory_facts = await memory.recall(MemoryStore.project_hash(workdir))
     skills = ""
     if skills_dirs and not ignore_rules:
-        skills = skills_to_system_prompt_section(discover_skills(skills_dirs))
+        loaded = discover_skills(skills_dirs)
+        # P0.4: injected skills count as a use — the curator's stale
+        # signal needs real usage, not edit mtimes.
+        for s in loaded:
+            record_use(s.source)
+        skills = skills_to_system_prompt_section(loaded)
     # Phase H.2: workspace snapshot (git state + verify commands) —
     # computed per session so the cache key reflects the repo state.
     from eaccode.agent.workspace import build_coding_workspace_block
