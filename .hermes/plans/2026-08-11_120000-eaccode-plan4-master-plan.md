@@ -820,8 +820,16 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 ---
 
-**Masterplan abgeschlossen:** Phasen A–K abgearbeitet · 802 Tests grün · Tag v0.3.0.
-Bewusst offen (dokumentiert): H.9 Clipboard-Bilder (PIL), G.9 MCP-Server,
-J.1/J.3/J.5/J.7/J.8/J.10–J.12/J.16/J.20/J.26/J.28/J.29/J.38/J.39/J.43/J.45/J.48–J.54
-(optional/extern).
+**Masterplan v0.3.0 abgeschlossen** + **TUI v0.4.0 in Arbeit** (Plan `.hermes/plans/2026-08-11_140000-eaccode-tui-redesign.md`):
+
+| Phase | Status |
+|---|---|
+| TUI-A.1 Layout (Header/Footer/Boxen weg) | ✅ `e9d3d69` |
+| TUI-A.2 ASCII-Spinner | ✅ `e9d3d69` |
+| TUI-A.3 render_message + Permission-Prompt | ✅ `e9d3d69` |
+| TUI-A.4 Status-Bar | ✅ `e9d3d69` |
+| TUI-A.5 Tests grün + Ruff sauber | ✅ `e9d3d69` |
+| TUI-B Inline-Permission | ⬜ ausstehend |
+| TUI-C Slash-Overlay | ⬜ ausstehend |
+| TUI-D Wire-up + v0.4.0-Tag | ⬜ ausstehend |
 
