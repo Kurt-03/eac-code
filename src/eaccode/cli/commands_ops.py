@@ -162,7 +162,8 @@ def recipes_command() -> None:
 @main.command("manifest")
 def manifest_command() -> None:
     """Show project manifest info (J.18)."""
-    from importlib.metadata import PackageNotFoundError, version as pkg_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as pkg_version
 
     from eaccode.cli import main as _main
 
