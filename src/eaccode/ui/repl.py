@@ -267,28 +267,101 @@ class EaccodeApp(App):
             # `_hide_spinner` path called from on_text / on_tool_result.
 
     def _ask_permission_async(self, tool_name: str, arguments: dict, question: str) -> object:
-        """Push the permission modal; return a Future the loop awaits (B.1)."""
+        """v0.4.0 (Phase B): inline permission question in the Log stream.
+
+        We write the prompt via ``render_permission_prompt`` into the Log,
+        arm a key listener (y/a/n/p/Esc), and return a Future the loop
+        awaits. ``/approve <id>`` and ``/deny <id>`` still work because
+        the ApprovalRegistry is fed the same Future.
+        """
         import asyncio
 
-        from eaccode.ui.permission_modal import PermissionModal
+        from eaccode.security.guards import display_arguments
+        from eaccode.tui.render import render_permission_prompt
 
         future: asyncio.Future = asyncio.get_running_loop().create_future()
-        # H.1: redacted + canonicalized arguments for the permission modal.
-        from eaccode.security.guards import display_arguments
-
         display_args = display_arguments(tool_name, arguments, self.workdir)
-        modal = PermissionModal(tool_name, display_args, question,
-                                resolve=future.set_result)
-        self.push_screen(modal)
+        log = self.query_one("#log", RichLog)
+        # Diff preview for write/edit (best-effort).
+        diff = self._diff_preview(tool_name, display_args)
+        prompt_text = render_permission_prompt(tool_name, display_args, diff)
+        log.write(prompt_text)
+        self._pending_permission = {
+            "future": future,
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "choices": {"y", "a", "n", "p"},
+        }
         # B.4: register the ask so /approve <id> / /deny <id> can resolve
         # it while the modal is open (or after the fact).
         self._approvals.register(tool_name, arguments, question, future)
-        # P0.9: count approvals; after 3x of the same pattern suggest the
-        # allowlist (one hint, then the counter resets).
         future.add_done_callback(
             lambda f: self._on_approval_resolved(tool_name, arguments, f)
         )
         return future
+
+    def _diff_preview(self, tool_name: str, arguments: dict) -> str | None:
+        """Best-effort unified-diff for write/edit calls (Phase B.2)."""
+        if tool_name not in ("write", "edit"):
+            return None
+        try:
+            from eaccode.ui.permission_modal import build_unified_diff
+
+            path_str = arguments.get("path", "")
+            if not path_str:
+                return None
+            from pathlib import Path
+
+            path = Path(path_str)
+            if tool_name == "write":
+                content = arguments.get("content", "")
+                if path.exists():
+                    old = path.read_text(encoding="utf-8", errors="replace")
+                    return build_unified_diff(old, content, str(path))
+                # new file — first 30 lines
+                lines = content.splitlines()[:30]
+                return ("--- /dev/null\n+++ " + str(path) + "\n"
+                        + "\n".join(f"+{ln}" for ln in lines))
+            # edit
+            old = arguments.get("old_string", "")
+            new = arguments.get("new_string", "")
+            if not old or not path.exists():
+                return None
+            text = path.read_text(encoding="utf-8", errors="replace")
+            return build_unified_diff(text, text.replace(old, new, 1),
+                                      str(path))
+        except Exception:
+            return None
+
+    def _resolve_pending_permission(self, choice: str) -> None:
+        """Resolve the in-flight permission ask with *choice* (y/a/n/p)."""
+        from eaccode.permissions.prompts import PermissionChoice
+
+        pending = getattr(self, "_pending_permission", None)
+        if not pending:
+            return
+        future = pending["future"]
+        if future.done():
+            return
+        mapping = {
+            "y": PermissionChoice.ALLOW_ONCE,
+            "a": PermissionChoice.ALLOW_ALWAYS,
+            "n": PermissionChoice.DENY,
+            "p": PermissionChoice.PAUSE,
+        }
+        future.set_result(mapping[choice])
+        self._pending_permission = None
+        self.query_one("#log", RichLog).write(f"  → {choice}")
+
+    def on_key(self, event) -> None:
+        """v0.4.0 (Phase B): route y/a/n/p/Esc to the pending permission."""
+        if not getattr(self, "_pending_permission", None):
+            return
+        key = event.key.lower()
+        if key in ("y", "a", "n", "p", "escape"):
+            self._resolve_pending_permission("n" if key == "escape" else key)
+            event.prevent_default()
+            event.stop()
 
     def _on_approval_resolved(self, tool_name: str, arguments: dict, future) -> None:
         """P0.9 suggest-mode: after repeated approvals, offer /allow."""
