@@ -35,6 +35,25 @@ def save_checkpoint(workdir: Path, target: Path) -> Path | None:
     return dest
 
 
+def cleanup_old_checkpoints(workdir: Path, max_age_days: int = 7) -> int:
+    """F.26: remove checkpoint files older than *max_age_days*; returns count."""
+    import time
+
+    cdir = checkpoint_dir(workdir)
+    if not cdir.is_dir():
+        return 0
+    cutoff = time.time() - max_age_days * 86400
+    removed = 0
+    for f in cdir.iterdir():
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink()
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
 def list_checkpoints(workdir: Path) -> list[Path]:
     cdir = checkpoint_dir(workdir)
     if not cdir.exists():

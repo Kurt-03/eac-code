@@ -45,6 +45,9 @@ class AgentConfig:
     # F.13: runtime cwd — where relative tool paths resolve; the loop
     # seeds ToolContext.runtime_cwd from here (defaults to workdir).
     runtime_cwd: Path | None = None
+    # F.27/F.28: emergency-stop flag (asyncio.Event) — when set, the next
+    # tool execution raises InterruptedError instead of running.
+    estop_flag: object | None = None
     # Phase B.1: async permission ask —
     # callable(tool_name, arguments, question) -> Future[PermissionChoice].
     # When None, the sync click.confirm path (or headless deny) is used.
@@ -106,6 +109,7 @@ class AgentLoop:
             writer_id=self.config.writer_id,
         )
         total_usage = TokenUsage()
+        self._empty_response_retries = 0  # F.24: verify_on_stop counter
         self.guardrails.reset_for_turn()
         self._memory_used_since_nudge = False
 
@@ -135,6 +139,17 @@ class AgentLoop:
                 )
 
             if not resp.tool_calls:
+                # F.24: verify_on_stop — an empty final response gets one
+                # retry, then an explicit error instead of a silent hang.
+                from eaccode.agent.runtime_helpers import is_final_response
+
+                if not is_final_response(resp.text):
+                    if self._empty_response_retries < 1:
+                        self._empty_response_retries += 1
+                        continue
+                    raise RuntimeError(
+                        "Model stopped without a final answer (verify_on_stop)"
+                    )
                 self._finalize_turn(messages, resp.text, resp.usage, turn)
                 return AgentResult(
                     final_text=resp.text,
@@ -159,9 +174,12 @@ class AgentLoop:
                 result = await self._execute_guarded(tc, ctx)
                 # F.19: sanitize credential-like strings before the model
                 # sees the tool result (mirrors the session-save redaction).
+                # F.23: errors carry an explicit evidence marker.
                 from eaccode.security.redact import redact_secrets
 
                 content = redact_secrets(result.content)
+                if result.is_error:
+                    content = f"[tool error: {tc.name}] {content}"
                 messages.append(
                     Message.tool_result(
                         tc.id, content, is_error=result.is_error, name=tc.name
@@ -333,9 +351,12 @@ class AgentLoop:
                     on_tool_call(tc)
                 result = await self._execute_guarded(tc, ctx)
                 # F.19: sanitize credential-like strings for the model.
+                # F.23: errors carry an explicit evidence marker.
                 from eaccode.security.redact import redact_secrets
 
                 content = redact_secrets(result.content)
+                if result.is_error:
+                    content = f"[tool error: {tc.name}] {content}"
                 messages.append(
                     Message.tool_result(
                         tc.id, content, is_error=result.is_error, name=tc.name
@@ -389,6 +410,10 @@ class AgentLoop:
         context (the LLM sees them and can change strategy); blocks
         short-circuit with a synthetic error result.
         """
+        # F.27/F.28: emergency stop — the user hit Esc mid-run.
+        flag = self.config.estop_flag
+        if flag is not None and getattr(flag, "is_set", lambda: False)():
+            raise InterruptedError("Session stopped by the user (estop)")
         from eaccode.tools.base import ToolResult
 
         # P0.10: pre-tool hooks (advisory — failures never block).

@@ -1,5 +1,8 @@
 """Tests for F-block features (F.18-F.22)."""
 
+import pytest
+from pydantic import BaseModel
+
 from eaccode.agent.runtime_helpers import summarize_reasoning
 from eaccode.config.providers import ProviderConfig, SecretStr
 
@@ -60,3 +63,174 @@ def test_resolver_reasoning_auto_leaves_kwargs_alone():
     req = CompletionRequest(messages=[Message.user("hi")], max_tokens=10)
     kwargs = _resolver("auto")._base_kwargs(req)
     assert "extra_body" not in kwargs
+
+
+# ---------------------------------------------------------------- F.25
+
+
+def test_redact_jwt():
+    from eaccode.security.redact import redact_secrets
+
+    jwt = ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+           "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U")
+    assert "[REDACTED]" in redact_secrets(f"token={jwt}")
+    assert jwt not in redact_secrets(jwt)
+
+
+def test_redact_pem_block():
+    from eaccode.security.redact import redact_secrets
+
+    pem = ("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEF\n"
+           "-----END PRIVATE KEY-----")
+    assert "[REDACTED]" in redact_secrets(pem)
+
+
+def test_redact_sk_proj():
+    from eaccode.security.redact import redact_secrets
+
+    key = "sk-proj-abcdefghijklmnopqrstuvwxyz123456"
+    assert key not in redact_secrets(f"key: {key}")
+
+
+# ---------------------------------------------------------------- F.26
+
+
+def test_cleanup_old_checkpoints(tmp_path):
+    import os
+
+    from eaccode.tools.checkpoints import (
+        checkpoint_dir,
+        cleanup_old_checkpoints,
+    )
+
+    cdir = checkpoint_dir(tmp_path)
+    cdir.mkdir(parents=True)
+    old = cdir / "old.json"
+    old.write_text("x")
+    old_time = os.path.getmtime(old) - 20 * 86400
+    os.utime(old, (old_time, old_time))
+    fresh = cdir / "fresh.json"
+    fresh.write_text("x")
+    assert cleanup_old_checkpoints(tmp_path, max_age_days=7) == 1
+    assert not old.exists()
+    assert fresh.exists()
+
+
+# ---------------------------------------------------------------- F.24
+
+
+@pytest.mark.asyncio
+async def test_verify_on_stop_retries_once_then_raises(tmp_path):
+    from eaccode.agent.loop import AgentConfig, AgentLoop
+    from eaccode.config.settings import PermissionMode
+    from eaccode.llm.client import CompletionResponse, TokenUsage
+    from eaccode.llm.models import Message
+    from eaccode.permissions.policy import PolicyEngine
+    from eaccode.permissions.rules import RuleSet
+    from eaccode.tools.base import ToolRegistry
+
+    class EmptyClient:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, req):
+            self.calls += 1
+            return CompletionResponse(
+                text="   ", tool_calls=[], stop_reason="end_turn",
+                usage=TokenUsage(), model="fake",
+            )
+
+    client = EmptyClient()
+    loop = AgentLoop(
+        client, ToolRegistry(),
+        PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
+        AgentConfig(workdir=tmp_path, max_turns=5),
+    )
+    with pytest.raises(RuntimeError, match="verify_on_stop"):
+        await loop.run([Message.user("hi")])
+    assert client.calls == 2  # initial empty answer + one retry
+    assert loop._empty_response_retries == 1
+
+
+@pytest.mark.asyncio
+async def test_verify_on_stop_recovers_with_second_answer(tmp_path):
+    from eaccode.agent.loop import AgentConfig, AgentLoop
+    from eaccode.config.settings import PermissionMode
+    from eaccode.llm.client import CompletionResponse, TokenUsage
+    from eaccode.llm.models import Message
+    from eaccode.permissions.policy import PolicyEngine
+    from eaccode.permissions.rules import RuleSet
+    from eaccode.tools.base import ToolRegistry
+
+    class FlakyClient:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, req):
+            self.calls += 1
+            text = "real answer" if self.calls > 1 else "  "
+            return CompletionResponse(
+                text=text, tool_calls=[], stop_reason="end_turn",
+                usage=TokenUsage(), model="fake",
+            )
+
+    loop = AgentLoop(
+        FlakyClient(), ToolRegistry(),
+        PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
+        AgentConfig(workdir=tmp_path, max_turns=5),
+    )
+    result = await loop.run([Message.user("hi")])
+    assert result.final_text == "real answer"
+
+
+# ---------------------------------------------------------------- F.27/28
+
+
+@pytest.mark.asyncio
+async def test_estop_flag_stops_tool_execution(tmp_path):
+    import asyncio
+
+    from eaccode.agent.loop import AgentConfig, AgentLoop
+    from eaccode.config.settings import PermissionMode
+    from eaccode.llm.client import CompletionResponse, TokenUsage
+    from eaccode.llm.models import Message, ToolCall
+    from eaccode.permissions.policy import PolicyEngine
+    from eaccode.permissions.rules import RuleSet
+    from eaccode.tools.base import Tool, ToolRegistry, ToolResult
+
+    ran = []
+
+    class BoomInput(BaseModel):
+        pass
+
+    class BoomTool(Tool):
+        name = "boom"
+        description = "boom"
+        input_model = BoomInput
+        requires_permission = False
+        tool_class = None
+
+        async def run(self, input, ctx):
+            ran.append("ran")
+            return ToolResult(content="x")
+
+    class ToolClient:
+        def complete(self, req):
+            return CompletionResponse(
+                text="", tool_calls=[ToolCall(id="1", name="boom",
+                                              arguments={})],
+                stop_reason="tool_calls", usage=TokenUsage(), model="fake",
+            )
+
+    reg = ToolRegistry()
+    reg.register(BoomTool())
+    flag = asyncio.Event()
+    loop = AgentLoop(
+        ToolClient(), reg,
+        PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
+        AgentConfig(workdir=tmp_path, max_turns=2, estop_flag=flag),
+    )
+    flag.set()  # user hit Esc before/while the tool ran
+    with pytest.raises(InterruptedError):
+        await loop.run([Message.user("go")])
+    assert ran == []

@@ -113,6 +113,10 @@ class EaccodeApp(App):
         self._session_lock: Path | None = None
         self._session_store: SessionStore | None = None
         self._save_sessions = _settings.save_sessions
+        # F.27/F.28: emergency-stop flag shared with the agent loop.
+        import asyncio
+
+        self._estop_flag = asyncio.Event()
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
 
@@ -196,6 +200,8 @@ class EaccodeApp(App):
 
             agent.config.pause_flag = PauseFlag()
         self._pause_flag = agent.config.pause_flag
+        # F.27/F.28: estop flag (set by Ctrl+C while busy).
+        agent.config.estop_flag = self._estop_flag
         # P0.9: wire the persistent allowlist into the policy engine.
         agent.policy.allowlist = self._allowlist
         self.memory_facts = sysctx.memory_facts
@@ -625,6 +631,10 @@ class EaccodeApp(App):
     def action_quit_or_cancel(self) -> None:
         """Ctrl+C: cancel a running agent, otherwise quit the app."""
         if self._busy and self._current_task:
+            # F.27/F.28: estop flag — the loop stops executing tools.
+            flag = getattr(self, "_estop_flag", None)
+            if flag is not None:
+                flag.set()
             self._current_task.cancel()
             self.query_one("#log", RichLog).write(
                 "[yellow]⏹ interrupted by user[/yellow]"

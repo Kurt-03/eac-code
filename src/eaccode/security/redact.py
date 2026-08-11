@@ -26,6 +26,17 @@ _PATTERNS = [
         r"(?i)(api[_-]?key|apikey|password|passwd|token|secret|client[_-]?secret)"
         r"\s*[=:]\s*['\"]?[A-Za-z0-9._~+/=-]{6,}['\"]?"
     ),
+    # F.25: JWTs (three base64url segments)
+    re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b"),
+    # F.25: PEM private key blocks
+    re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
+        re.DOTALL,
+    ),
+    # F.25: AWS secret access keys (40 base64 chars)
+    re.compile(r"\b[A-Za-z0-9/+=]{40}\b(?=\s*$|['\"\s])"),
+    # F.25: OpenAI project keys (sk-proj-...)
+    re.compile(r"\bsk-proj-[A-Za-z0-9_-]{10,}\b"),
 ]
 
 
