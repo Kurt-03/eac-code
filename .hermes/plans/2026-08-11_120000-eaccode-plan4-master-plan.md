@@ -692,25 +692,25 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| E.1 Subcommands anlegen | ⬜ | — |
-| E.2 First-Run-Setup | ⬜ | — |
-| E.3 Settings-Sektionen | ⬜ | — |
-| E.4 Config-Migration | ⬜ | — |
-| E.5 fallback_config | ⬜ | — |
-| E.6 env_loader | ⬜ | — |
-| E.7 model_setup_flows | ⬜ | — |
-| E.8 /plugins Command | ⬜ | — |
-| E.9 oneshot prüfen | ⬜ | — |
-| E.11 env_probe | ⬜ | — |
-| E.12 /hooks Command | ⬜ | — |
-| E.13 Backup-CLI | ⬜ | — |
-| E.14 Update-Cmd | ⬜ | — |
-| E.15 Doctor erweitern | ⬜ | — |
-| E.16 dump | ⬜ | — |
-| E.17 dep_ensure | ⬜ | — |
-| E.18 /version + build_info | ⬜ | — |
-| E.19 init_command | ⬜ | — |
-| E.20 /status erweitern | ⬜ | — |
+| E.1 Subcommands anlegen | ✅ | `0e14b10` |
+| E.2 First-Run-Setup | ✅ | `0e14b10` |
+| E.3 Settings-Sektionen | ✅ | `0e14b10` |
+| E.4 Config-Migration | ✅ | `0e14b10` |
+| E.5 fallback_config | ✅ | `0e14b10` |
+| E.6 env_loader | ✅ | `0e14b10` |
+| E.7 model_setup_flows | ✅ | `0e14b10` |
+| E.8 /plugins Command | ✅ | `0e14b10` |
+| E.9 oneshot prüfen | ✅ | `0e14b10` (eaccode run existiert, Test ergänzt) |
+| E.11 env_probe | ✅ | `0e14b10` |
+| E.12 /hooks Command | ✅ | `0e14b10` |
+| E.13 Backup-CLI | ✅ | `0e14b10` |
+| E.14 Update-Cmd | ✅ | `0e14b10` |
+| E.15 Doctor erweitern | ✅ | `0e14b10` |
+| E.16 dump | ✅ | `0e14b10` |
+| E.17 dep_ensure | ✅ | `0e14b10` |
+| E.18 /version + build_info | ✅ | `0e14b10` |
+| E.19 init_command | ✅ | `0e14b10` |
+| E.20 /status erweitern | ✅ | `0e14b10` |
 
 ### Phase F — Agent-Runtime
 

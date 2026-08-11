@@ -40,6 +40,8 @@ class ToolContext(BaseModel):
     memory_dir: Path | None = None
     # P0.5: writer identity for file-state coordination ("main" or "sub:<id>").
     writer_id: str = "main"
+    # F.13: runtime cwd — where relative paths resolve (defaults to workdir).
+    runtime_cwd: Path | None = None
     config: Any = None
 
 

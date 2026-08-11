@@ -81,3 +81,81 @@ def test_review_whitelist_filters_registry():
                      "skill_remove_file"}
     assert "bash" not in names
     assert "write" not in names
+
+
+@pytest.mark.asyncio
+async def test_turn_complete_callback_fires(tmp_path):
+    """F.7: on_turn_complete receives (turn, text, usage)."""
+    from eaccode.agent.loop import AgentConfig, AgentLoop
+    from eaccode.config.settings import PermissionMode
+    from eaccode.llm.client import CompletionResponse, TokenUsage
+    from eaccode.permissions.policy import PolicyEngine
+    from eaccode.permissions.rules import RuleSet
+    from eaccode.tools.base import ToolRegistry
+
+    class FakeClient:
+        def complete(self, req):
+            return CompletionResponse(
+                text="final answer", tool_calls=[], stop_reason="end_turn",
+                usage=TokenUsage(input_tokens=5, output_tokens=3),
+                model="fake",
+            )
+
+    events = []
+
+    def on_turn_complete(turn, text, usage):
+        events.append((turn, text, usage.input_tokens))
+
+    loop = AgentLoop(
+        FakeClient(), ToolRegistry(),
+        PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
+        AgentConfig(workdir=tmp_path, max_turns=3,
+                    on_turn_complete=on_turn_complete),
+    )
+    result = await loop.run([Message.user("hi")])
+    assert result.final_text == "final answer"
+    assert events == [(0, "final answer", 5)]
+    assert result.usage.input_tokens == 5
+
+
+@pytest.mark.asyncio
+async def test_runtime_cwd_flows_into_tool_context(tmp_path):
+    """F.13: runtime_cwd seeds ToolContext.runtime_cwd."""
+    from eaccode.agent.loop import AgentConfig, AgentLoop
+    from eaccode.config.settings import PermissionMode
+    from eaccode.llm.client import CompletionResponse, TokenUsage
+    from eaccode.permissions.policy import PolicyEngine
+    from eaccode.permissions.rules import RuleSet
+
+    seen = {}
+
+    class EchoTool:
+        name = "echo_ctx"
+        description = "echo"
+        input_model = None
+        requires_permission = False
+        tool_class = None
+        async def run(self, input, ctx):
+            seen["runtime_cwd"] = ctx.runtime_cwd
+            from eaccode.tools.base import ToolResult
+            return ToolResult(content="ok")
+
+    class FakeClient:
+        def complete(self, req):
+            return CompletionResponse(
+                text="", tool_calls=[ToolCall(id="1", name="echo_ctx",
+                                              arguments={})],
+                stop_reason="tool_calls", usage=TokenUsage(), model="fake",
+            )
+
+    reg = ToolRegistry()
+    reg.register(EchoTool())
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    loop = AgentLoop(
+        FakeClient(), reg,
+        PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet()),
+        AgentConfig(workdir=tmp_path, runtime_cwd=sub, max_turns=1),
+    )
+    await loop.run([Message.user("go")])
+    assert seen["runtime_cwd"] == sub
