@@ -563,12 +563,15 @@ class EaccodeApp(App):
         except RuntimeError:
             loop = None
         if loop is not None and loop.is_running():
-            self._save_task = asyncio.create_task(
-                self._session_store.save(
-                    title, msgs, metadata,
-                    session_id=self._session_id, provenance=provenance,
+            from eaccode.agent.thread_silence import thread_silenced
+
+            with thread_silenced():  # F.29: background worker stays quiet
+                self._save_task = asyncio.create_task(
+                    self._session_store.save(
+                        title, msgs, metadata,
+                        session_id=self._session_id, provenance=provenance,
+                    )
                 )
-            )
         else:  # pragma: no cover - headless contexts
             asyncio.run(
                 self._session_store.save(

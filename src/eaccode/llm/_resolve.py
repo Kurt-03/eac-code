@@ -109,6 +109,9 @@ class _ResolveMixin:
             kwargs["api_key"] = provider.api_key.get_secret_value()
             if provider.base_url:
                 kwargs["api_base"] = provider.base_url
+        # F.36: per-request timeout (only when explicitly configured).
+        if getattr(self, "timeout", None):
+            kwargs["timeout"] = self.timeout
         # F.22: LM-Studio-style reasoning toggle via extra_body (only when
         # the provider explicitly configures it).
         if provider is not None and getattr(provider, "reasoning", "auto") != "auto":

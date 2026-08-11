@@ -183,7 +183,63 @@ async def test_verify_on_stop_recovers_with_second_answer(tmp_path):
     assert result.final_text == "real answer"
 
 
-# ---------------------------------------------------------------- F.27/28
+# ---------------------------------------------------------------- F.32
+
+
+def test_classify_transient():
+    from eaccode.agent.error_classifier import classify_error, should_retry
+
+    assert classify_error(RuntimeError("rate limit exceeded")) == "transient"
+    assert classify_error(TimeoutError("timed out")) == "transient"
+    assert classify_error(RuntimeError("500 server error")) == "transient"
+    assert should_retry(RuntimeError("rate limit"), 0) is True
+    assert should_retry(RuntimeError("rate limit"), 2) is False
+
+
+def test_classify_permanent():
+    from eaccode.agent.error_classifier import classify_error, should_retry
+
+    assert classify_error(RuntimeError("invalid api key")) == "permanent"
+    assert classify_error(RuntimeError("401 unauthorized")) == "permanent"
+    assert should_retry(RuntimeError("invalid api key"), 0) is False
+
+
+def test_classify_needs_input():
+    from eaccode.agent.error_classifier import classify_error
+
+    assert classify_error(RuntimeError("permission required")) == "needs_input"
+    assert classify_error(RuntimeError("missing required field")) == "needs_input"
+
+
+# ---------------------------------------------------------------- F.29
+
+
+def test_thread_silence_context():
+    from eaccode.agent.thread_silence import is_worker_silent, thread_silenced
+
+    assert is_worker_silent() is False
+    with thread_silenced():
+        assert is_worker_silent() is True
+    assert is_worker_silent() is False
+
+
+# ---------------------------------------------------------------- F.36
+
+
+def test_resolver_timeout_kwarg():
+    from eaccode.llm._resolve import _ResolveMixin
+    from eaccode.llm.client import CompletionRequest
+    from eaccode.llm.models import Message
+
+    resolver = _ResolveMixin.__new__(_ResolveMixin)
+    resolver.default_model = "m"
+    resolver.provider_name = "opencode-go"
+    resolver.providers = {"opencode-go": _provider("auto")}
+    resolver.timeout = 42.0
+    req = CompletionRequest(messages=[Message.user("hi")], max_tokens=10)
+    assert resolver._base_kwargs(req)["timeout"] == 42.0
+    resolver.timeout = None
+    assert "timeout" not in resolver._base_kwargs(req)
 
 
 @pytest.mark.asyncio

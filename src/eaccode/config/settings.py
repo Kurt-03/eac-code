@@ -70,6 +70,12 @@ class Settings(BaseModel):
     # E.3: CLI-related sections.
     backup_keep_days: int = Field(default=7, ge=0, description="E.13: keep N daily backups")
     update_auto_check: bool = Field(default=False, description="E.14: check for updates on start")
+    # F.31/F.33/F.36/F.37: runtime budget + limits.
+    prompt_cache_max: int = Field(default=32, ge=0, description="F.31: system-prompt cache slots")
+    max_output_tokens: int = Field(default=8192, ge=1, description="F.33: bounded response size")
+    request_timeout: float = Field(default=120.0, gt=0, description="F.36: per-request timeout (s)")
+    max_turns: int = Field(default=50, ge=1, description="F.37: default turn budget")
+    max_cost_usd: float | None = Field(default=None, ge=0, description="F.37: per-run cost cap")
 
     @classmethod
     def load(cls, path: Path) -> Settings:

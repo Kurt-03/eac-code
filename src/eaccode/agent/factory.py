@@ -26,7 +26,7 @@ from eaccode.tools.factory import build_default_registry
 # (identity → rules → memory → skills → behavior) so providers can cache
 # the prefix; memoizing the build keeps repeated constructions identical.
 _prompt_cache: dict[tuple, SystemContext] = {}
-_PROMPT_CACHE_MAX = 32
+_PROMPT_CACHE_MAX = 32  # F.31: overridable via build_system_context_async
 
 # A.6: above this many skills the static injection collapses into an index;
 # trigger-matched skills are injected dynamically per turn by the loop.
@@ -68,7 +68,8 @@ async def build_system_context_async(
     memory: MemoryStore | None = None,
     ignore_rules: bool = False,
     markdown_memory_dir: Path | None = None,
-    skills_auto_load: bool = True,  # A.7: settings.skills.auto_load
+    skills_auto_load: bool = True,
+    prompt_cache_max: int = 32,  # F.31: cache slots (settings.prompt_cache_max)
 ) -> SystemContext:
     """Compose the system prompt from project rules + memory + skills.
 
@@ -118,7 +119,7 @@ async def build_system_context_async(
         workspace_block=workspace_block,
     )
     ctx = SystemContext(system_prompt=prompt, memory_facts=memory_facts)
-    if len(_prompt_cache) >= _PROMPT_CACHE_MAX:
+    if len(_prompt_cache) >= prompt_cache_max:  # F.31
         _prompt_cache.clear()
     _prompt_cache[key] = ctx
     return ctx
@@ -218,6 +219,7 @@ async def build_agent_async(
         providers_file=paths.providers_file,
         provider_name=provider_name,
         effort=settings.effort,
+        timeout=settings.request_timeout,  # F.36
     )
     registry = build_default_registry(allowed_tools)
     for tool in mcp_tools or []:
@@ -239,6 +241,7 @@ async def build_agent_async(
         ignore_rules=settings.ignore_rules,
         markdown_memory_dir=paths.memory_dir,
         skills_auto_load=settings.skills.auto_load,
+        prompt_cache_max=settings.prompt_cache_max,  # F.31
     )
     agent = AgentLoop(
         client,
@@ -246,7 +249,9 @@ async def build_agent_async(
         policy,
         AgentConfig(
             workdir=workdir,
-            max_turns=max_turns or settings.max_turns,
+            max_turns=max_turns or settings.max_turns,  # F.37
+            max_budget_usd=settings.max_cost_usd,  # F.37: per-run cost cap
+            max_output_tokens=settings.max_output_tokens,  # F.33
             system_prompt=sysctx.system_prompt,
             # P0.2: auto-compaction settings (settings.yaml auto_compact /
             # compact_threshold). The loop compacts when the window fills.

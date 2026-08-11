@@ -97,10 +97,12 @@ class LLMClient(_ResolveMixin, _StreamMixin):
         provider_name: str | None = None,
         effort: str = "medium",
         fallback_chain: FallbackChain | None = None,
+        timeout: float | None = None,  # F.36: per-request timeout (s)
     ) -> None:
         self.default_model = default_model
         self.provider_name = provider_name
         self.effort = effort
+        self.timeout = timeout
         self.fallback_chain = fallback_chain or FallbackChain()
         self.providers = {p.name: p for p in load_providers(providers_file)}
         for p in self.providers.values():

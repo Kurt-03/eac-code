@@ -45,6 +45,8 @@ class AgentConfig:
     # F.13: runtime cwd — where relative tool paths resolve; the loop
     # seeds ToolContext.runtime_cwd from here (defaults to workdir).
     runtime_cwd: Path | None = None
+    # F.33: bounded response size (settings.max_output_tokens).
+    max_output_tokens: int = 8192
     # F.27/F.28: emergency-stop flag (asyncio.Event) — when set, the next
     # tool execution raises InterruptedError instead of running.
     estop_flag: object | None = None
@@ -128,6 +130,7 @@ class AgentLoop:
                 tools=tool_schemas,
                 system=self.config.system_prompt,
                 stream=False,
+                max_tokens=self.config.max_output_tokens,  # F.33
             )
             resp = self.client.complete(req)
             total_usage += resp.usage
@@ -310,6 +313,7 @@ class AgentLoop:
                 tools=tool_schemas,
                 system=self.config.system_prompt,
                 stream=True,
+                max_tokens=self.config.max_output_tokens,  # F.33
             )
             text_parts: list[str] = []
             tool_calls: list[ToolCall] = []
