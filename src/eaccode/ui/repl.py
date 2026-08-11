@@ -309,6 +309,9 @@ class EaccodeApp(App):
         diff = self._diff_preview(tool_name, display_args)
         prompt_text = render_permission_prompt(tool_name, display_args, diff)
         log.write(prompt_text)
+        # v0.4.0 fix: disable the Input widget so its key handlers stop
+        # swallowing y/a/n/p. We re-enable it once the future resolves.
+        self.query_one("#input", Input).disabled = True
         self._pending_permission = {
             "future": future,
             "tool_name": tool_name,
@@ -374,6 +377,11 @@ class EaccodeApp(App):
         }
         future.set_result(mapping[choice])
         self._pending_permission = None
+        # Re-enable the input widget that was disabled in _ask_permission_async.
+        try:
+            self.query_one("#input", Input).disabled = False
+        except Exception:
+            pass
         self.query_one("#log", RichLog).write(f"  → {choice}")
 
     def on_key(self, event) -> None:

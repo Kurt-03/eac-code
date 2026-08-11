@@ -29,9 +29,11 @@ class PermissionChoice(str, enum.Enum):  # noqa: UP042  (str value for JSON/sche
     PAUSE = "pause"  # P0.8: pause the session — no further tool calls
 
 
-# How long the REPL modal waits before denying (Hermes uses 120s; 60s is
-# enough for a human and prevents a hung agent when the user walks away).
-MODAL_TIMEOUT_SECONDS = 60.0
+# How long the REPL modal waits before denying. v0.4.0 raised this
+# from 60s to 10 minutes: real users pause to read multi-line diffs,
+# and a stuck-by-typo REPL that auto-denies after 1 minute is hostile.
+# The fail-closed default still kicks in if the user walks away.
+MODAL_TIMEOUT_SECONDS = 600.0
 
 
 def _describe(tool: str, arguments: dict) -> str:
