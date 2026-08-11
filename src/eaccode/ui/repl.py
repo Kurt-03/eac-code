@@ -95,6 +95,10 @@ class EaccodeApp(App):
 
         self._allowlist = AllowlistStore()
         self._approval_counts: dict[str, int] = {}
+        # B.4: pending approval registry (resolvable via /approve /deny).
+        from eaccode.permissions.approvals import ApprovalRegistry
+
+        self._approvals = ApprovalRegistry()
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
 
@@ -241,6 +245,9 @@ class EaccodeApp(App):
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         modal = PermissionModal(tool_name, arguments, question, resolve=future.set_result)
         self.push_screen(modal)
+        # B.4: register the ask so /approve <id> / /deny <id> can resolve
+        # it while the modal is open (or after the fact).
+        self._approvals.register(tool_name, arguments, question, future)
         # P0.9: count approvals; after 3x of the same pattern suggest the
         # allowlist (one hint, then the counter resets).
         future.add_done_callback(

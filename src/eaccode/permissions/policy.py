@@ -89,8 +89,8 @@ class PolicyEngine:
             )
             return Decision(Action.ALLOW, reason, allow_rule)
 
-        if self.mode == PermissionMode.SMART:
-            return self._decide_smart(tool, arguments, allow_rule)
+        if self.mode == PermissionMode.SAFE_AUTO:
+            return self._decide_safe_auto(tool, arguments, allow_rule)
 
         default_action = _MODE_DEFAULTS[self.mode].get(
             tool, _MODE_DEFAULTS[self.mode]["_default"]
@@ -102,31 +102,27 @@ class PolicyEngine:
             f"Default action for {self.mode.value} mode on {tool}",
         )
 
-    def _decide_smart(
+    def _decide_safe_auto(
         self, tool: str, arguments: dict, allow_rule: Rule | None
     ) -> Decision:
-        """Smart mode (Phase A.5): bash is classified by danger heuristics.
-
-        Safe commands auto-approve; dangerous ones (rm -rf, git reset
-        --hard, curl | sh, ...) ask for confirmation. All other tools
-        behave like default mode. Explicit rules still win.
-        """
+        """safeAuto (B.2/B.3): bash is classified — key patterns first,
+        then the aux LLM; unknown/unavailable fails open to ASK."""
         if allow_rule:
             return Decision(Action.ALLOW, "Allowed by rule", allow_rule)
         if tool == "bash":
-            from eaccode.permissions.danger import is_dangerous
+            from eaccode.permissions.smart import is_command_safe
 
             command = str(arguments.get("command", ""))
-            if not is_dangerous(command):
+            if is_command_safe(command):
                 return Decision(
                     Action.ALLOW,
-                    "Smart mode: command is not destructive",
+                    "safeAuto: classified safe",
                 )
             return Decision(
                 Action.ASK,
-                "Smart mode: command looks destructive — confirm?",
+                "safeAuto: not classified safe — confirm?",
             )
         default_action = _MODE_DEFAULTS[PermissionMode.DEFAULT].get(
             tool, _MODE_DEFAULTS[PermissionMode.DEFAULT]["_default"]
         )
-        return Decision(default_action, f"Smart mode default for {tool}")
+        return Decision(default_action, f"safeAuto default for {tool}")

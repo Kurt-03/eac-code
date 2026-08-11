@@ -55,7 +55,7 @@ def _cmd_mode(app, arg: str) -> CommandResult:
 
     if not arg:
         return CommandResult(
-            message="Usage: /mode <default|acceptEdits|plan|smart|bypassPermissions>"
+            message="Usage: /mode <default|acceptEdits|plan|safeAuto|bypassPermissions>"
         )
     try:
         new_mode = PermissionMode(arg)
@@ -63,8 +63,14 @@ def _cmd_mode(app, arg: str) -> CommandResult:
         app._mode_name = arg
         return CommandResult(message=f"Mode set to {arg}")
     except ValueError:
+        if arg == "smart":
+            return CommandResult(
+                message="`smart` was renamed to `safeAuto` (B.3) — "
+                        "use /mode safeAuto."
+            )
         return CommandResult(
-            message="Unknown mode. Valid: default, acceptEdits, plan, smart, bypassPermissions"
+            message="Unknown mode. Valid: default, acceptEdits, plan, "
+                    "safeAuto, bypassPermissions"
         )
 
 
@@ -84,6 +90,45 @@ def _cmd_resume(app, arg: str) -> CommandResult:
         flag.resume()
         return CommandResult(message="Session resumed.")
     return CommandResult(message="No pause flag in this context.")
+
+
+def _cmd_approve(app, arg: str) -> CommandResult:
+    """B.4: /approve <id> — approve a pending permission ask."""
+    from eaccode.permissions.prompts import PermissionChoice
+
+    registry = getattr(app, "_approvals", None)
+    if registry is None:
+        return CommandResult(message="No approval registry in this context.")
+    if not arg:
+        pending = registry.pending()
+        if not pending:
+            return CommandResult(message="No pending approvals.")
+        lines = [f"  {p.id}: {p.tool} — {p.question[:60]}" for p in pending]
+        lines.append("Approve with /approve <id>, deny with /deny <id>")
+        return CommandResult(message="Pending approvals:\n" + "\n".join(lines))
+    try:
+        approval_id = int(arg)
+    except ValueError:
+        return CommandResult(message="Usage: /approve <id>")
+    if registry.resolve(approval_id, PermissionChoice.ALLOW_ONCE):
+        return CommandResult(message=f"Approved #{approval_id}.")
+    return CommandResult(message=f"#{approval_id} is not pending (already decided).")
+
+
+def _cmd_deny(app, arg: str) -> CommandResult:
+    """B.4: /deny <id> — deny a pending permission ask."""
+    from eaccode.permissions.prompts import PermissionChoice
+
+    registry = getattr(app, "_approvals", None)
+    if registry is None:
+        return CommandResult(message="No approval registry in this context.")
+    try:
+        approval_id = int(arg)
+    except ValueError:
+        return CommandResult(message="Usage: /deny <id>")
+    if registry.resolve(approval_id, PermissionChoice.DENY):
+        return CommandResult(message=f"Denied #{approval_id}.")
+    return CommandResult(message=f"#{approval_id} is not pending (already decided).")
 
 
 def _cmd_allow(app, arg: str) -> CommandResult:
@@ -345,6 +390,8 @@ DISPATCH_TABLE: dict[str, object] = {
     "mode": _cmd_mode,
     "pause": _cmd_pause,
     "resume": _cmd_resume,
+    "approve": _cmd_approve,
+    "deny": _cmd_deny,
     "allow": _cmd_allow,
     "disallow": _cmd_disallow,
     "model": _cmd_model,

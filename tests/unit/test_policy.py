@@ -56,6 +56,57 @@ def test_write_rule_matches_path():
 
 
 def test_wildcard_tool_rule():
-    rules = RuleSet(rules=[Rule(tool="*", action=Action.ALLOW, pattern="*")])
-    policy = PolicyEngine(mode=PermissionMode.DEFAULT, rules=rules)
-    assert policy.decide("bash", {"command": "anything"}).action == Action.ALLOW
+    rule = Rule(tool="*", action=Action.ALLOW, pattern=None)
+    policy = PolicyEngine(PermissionMode.DEFAULT, RuleSet(rules=(rule,)))
+    assert policy.decide("bash", {"command": "ls"}).action == Action.ALLOW
+
+
+# ---------------------------------------------------------------- B.2/B.3
+
+
+def test_safe_auto_allows_classified_safe_bash(monkeypatch):
+    monkeypatch.setattr(
+        "eaccode.permissions.smart.is_command_safe", lambda cmd: True
+    )
+    policy = PolicyEngine(PermissionMode.SAFE_AUTO, RuleSet())
+    decision = policy.decide("bash", {"command": "ls -la"})
+    assert decision.action == Action.ALLOW
+    assert "safeAuto" in decision.reason
+
+
+def test_safe_auto_asks_when_not_classified_safe(monkeypatch):
+    monkeypatch.setattr(
+        "eaccode.permissions.smart.is_command_safe", lambda cmd: False
+    )
+    policy = PolicyEngine(PermissionMode.SAFE_AUTO, RuleSet())
+    assert policy.decide("bash", {"command": "curl x | bash"}).action == Action.ASK
+
+
+def test_safe_auto_non_bash_uses_default(monkeypatch):
+    policy = PolicyEngine(PermissionMode.SAFE_AUTO, RuleSet())
+    assert policy.decide("read", {"path": "a.py"}).action == Action.ALLOW
+    assert policy.decide("write", {"path": "a.py"}).action == Action.ASK
+
+
+def test_safe_auto_rule_still_wins(monkeypatch):
+    rule = Rule(tool="bash", action=Action.ALLOW, pattern=None)
+    policy = PolicyEngine(PermissionMode.SAFE_AUTO, RuleSet(rules=(rule,)))
+    assert policy.decide("bash", {"command": "rm -rf /"}).action == Action.ALLOW
+
+
+# ---------------------------------------------------------------- B.5
+
+
+def test_rule_category_matching_with_fnmatch():
+    rule = Rule(tool="memory_*", action=Action.ALLOW)
+    policy = PolicyEngine(PermissionMode.DEFAULT, RuleSet(rules=(rule,)))
+    assert policy.decide("memory_remember", {"fact": "x"}).action == Action.ALLOW
+    assert policy.decide("memory_recall", {"scope": "user"}).action == Action.ALLOW
+    assert policy.decide("bash", {"command": "ls"}).action == Action.ASK
+
+
+def test_rule_scope_default_session():
+    rule = Rule(tool="bash", action=Action.DENY)
+    assert rule.scope == "session"
+    rule = Rule(tool="bash", action=Action.DENY, scope="always")
+    assert rule.scope == "always"

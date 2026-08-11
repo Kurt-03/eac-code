@@ -647,19 +647,19 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 | A.8 default_soul | ✅ | `02febf6` |
 | A.9 Memory-Auto-Nudge | ✅ | `2d50807` |
 | A.10 memory_provider-Base | ✅ | `2d50807` |
-| A.11 Lokale Skill-Bundles | 🔄 | — |
-| A.12 mem_trim | 🔄 | — |
-| A.13 Lokale Skills-Sammlung | ⬜ | — |
+| A.11 Lokale Skill-Bundles | ✅ | `9624634` |
+| A.12 mem_trim | ✅ | `a32e593` |
+| A.13 Lokale Skills-Sammlung | ✅ | `9624634` (5 Bundles im Paket) |
 
 ### Phase B — safeAuto + Approval
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| B.1 Aux-LLM-Client | ⬜ | — |
-| B.2 safeAuto-Klassifikation | ⬜ | — |
-| B.3 /mode safeAuto (Migration) | ⬜ | — |
-| B.4 /approve + /deny | ⬜ | — |
-| B.5 Policy-Scopes | ⬜ | — |
+| B.1 Aux-LLM-Client | ✅ | `(B-Commit)` |
+| B.2 safeAuto-Klassifikation | ✅ | `(B-Commit)` |
+| B.3 /mode safeAuto (Migration) | ✅ | `(B-Commit)` |
+| B.4 /approve + /deny | ✅ | `(B-Commit)` |
+| B.5 Policy-Scopes | ✅ | `(B-Commit)` |
 
 ### Phase C — Background-Review + Curator
 

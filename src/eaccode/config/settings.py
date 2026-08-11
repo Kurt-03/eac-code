@@ -17,7 +17,10 @@ class PermissionMode(StrEnum):
     ACCEPT_EDITS = "acceptEdits"
     PLAN = "plan"
     BYPASS_PERMISSIONS = "bypassPermissions"
-    SMART = "smart"  # auto-approve safe bash, ask on dangerous commands
+    # B.3: `smart` was renamed — the honest name is safeAuto: bash is
+    # classified by an aux LLM (with key-pattern fallback) and fails
+    # open to manual approval; it never silently auto-allows.
+    SAFE_AUTO = "safeAuto"
 
 
 class CuratorSettings(BaseModel):
@@ -66,6 +69,9 @@ class Settings(BaseModel):
         if not path.exists():
             return cls()
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        # B.3/E.4: migrate the renamed permission mode.
+        if data.get("permission_mode") == "smart":
+            data["permission_mode"] = PermissionMode.SAFE_AUTO.value
         return cls(**data)
 
     def save(self, path: Path) -> None:

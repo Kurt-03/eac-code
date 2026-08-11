@@ -43,7 +43,7 @@ def test_permission_mode_enum_values():
         "acceptEdits",
         "plan",
         "bypassPermissions",
-        "smart",
+        "safeAuto",  # B.3: `smart` was renamed
         }
 
 
@@ -71,3 +71,11 @@ def test_skill_settings_defaults_and_roundtrip(tmp_path):
     loaded = Settings.load(file)
     assert loaded.skills.auto_load is False
     assert loaded.skills.dirs == ["C:/x"]
+
+
+def test_permission_mode_migrates_smart_to_safe_auto(tmp_path):
+    file = tmp_path / "eaccode.yaml"
+    file.write_text("permission_mode: smart\n", encoding="utf-8")
+    loaded = Settings.load(file)
+    assert loaded.permission_mode == PermissionMode.SAFE_AUTO
+    assert loaded.permission_mode.value == "safeAuto"
