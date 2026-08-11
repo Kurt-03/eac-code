@@ -1,6 +1,9 @@
 """CLI sub-commands — registered onto the main click group on import."""
 from __future__ import annotations
 
+import re
+from datetime import datetime, timedelta
+
 import click
 
 from eaccode.cli import main
@@ -22,7 +25,6 @@ def sessions() -> None:
 def sessions_list(limit: int, since: str | None, query: str | None) -> None:
     """List recent sessions (D.4: --since/--query filters)."""
     import asyncio
-    from datetime import datetime
 
     from eaccode.sessions.store import SessionStore
 
@@ -30,15 +32,17 @@ def sessions_list(limit: int, since: str | None, query: str | None) -> None:
     store = SessionStore(paths.sessions_dir / "sessions.db")
     since_ts: datetime | None = None
     if since:
-        try:
-            since_ts = datetime.fromisoformat(since)
-        except ValueError:
-            print_error(f"Invalid --since date: {since!r} (use YYYY-MM-DD)")
+        since_ts = _parse_since(since)
+        if since_ts is None:
+            print_error(f"Invalid --since date: {since!r} "
+                        "(use YYYY-MM-DD or relative like 7d/2w/30d)")
             raise SystemExit(2) from None
     for s in asyncio.run(store.list_sessions(limit=limit)):
         if since_ts:
             try:
-                updated = datetime.fromisoformat(s.updated_at)
+                raw = s.updated_at.isoformat() if isinstance(
+                    s.updated_at, datetime) else str(s.updated_at)
+                updated = datetime.fromisoformat(raw)
                 if updated < since_ts:
                     continue
             except ValueError:
@@ -46,7 +50,34 @@ def sessions_list(limit: int, since: str | None, query: str | None) -> None:
         if query and query.lower() not in s.title.lower():
             continue
         cwd = s.metadata.get("cwd", "")
-        print_info(f"  {s.id[:12]}  {s.title:40s} {s.updated_at[:19]}  {cwd}")
+        # updated_at may be a datetime or ISO string — normalize for display.
+        updated_txt = s.updated_at.isoformat() if isinstance(
+            s.updated_at, datetime) else str(s.updated_at)
+        print_info(f"  {s.id[:12]}  {s.title:40s} {updated_txt[:19]}  {cwd}")
+
+
+def _parse_since(value: str) -> datetime | None:
+    """Parse --since: YYYY-MM-DD or relative (7d, 2w, 30d, 12h)."""
+    import re
+
+    from datetime import datetime, timedelta
+
+    value = value.strip()
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        pass
+    match = re.fullmatch(r"(\d+)([dhw])", value.lower())
+    if not match:
+        return None
+    amount = int(match.group(1))
+    unit = match.group(2)
+    delta = (
+        timedelta(hours=amount) if unit == "h"
+        else timedelta(days=amount) if unit == "d"
+        else timedelta(weeks=amount)
+    )
+    return datetime.now() - delta
 
 
 @sessions.command("recap")
