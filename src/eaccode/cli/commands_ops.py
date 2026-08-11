@@ -143,6 +143,45 @@ def dump_command(workdir: str | None) -> None:
     print_info(f"# memory facts: {len(ctx.memory_facts)}")
 
 
+@main.command("recipes")
+def recipes_command() -> None:
+    """List reusable prompt recipes (J.15/J.27)."""
+    from eaccode.config.paths import EaccodePaths
+
+    recipes_dir = EaccodePaths().recipes_dir
+    recipes = sorted(recipes_dir.glob("*.md"))
+    if not recipes:
+        print_info(f"No recipes yet — drop markdown files into {recipes_dir}")
+        return
+    for r in recipes:
+        head = r.read_text(encoding="utf-8", errors="replace").splitlines()
+        title = next((ln for ln in head if ln.startswith("# ")), r.stem)
+        print_info(f"  {r.stem:24s} {title.lstrip('# ')[:60]}")
+
+
+@main.command("manifest")
+def manifest_command() -> None:
+    """Show project manifest info (J.18)."""
+    from importlib.metadata import PackageNotFoundError, version as pkg_version
+
+    from eaccode.cli import main as _main
+
+    print_info(f"commands: {len(_main.commands)}")
+    try:
+        print_info(f"version: {pkg_version('eaccode')}")
+    except PackageNotFoundError:
+        print_info("version: 0.1.0 (editable install)")
+    import sys
+
+    print_info(f"python: {sys.version.split()[0]}")
+    from eaccode.config.paths import EaccodePaths
+
+    p = EaccodePaths()
+    print_info(f"config: {p.config_dir}")
+    print_info(f"data: {p.data_dir}")
+    print_info(f"cron db: {p.cron_db}")
+
+
 @main.command("hooks")
 def hooks_command() -> None:
     """List hook scripts (E.12)."""

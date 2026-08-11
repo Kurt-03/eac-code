@@ -38,6 +38,7 @@ class EaccodePaths:
     skills_dir: Path
     plugins_dir: Path
     hooks_dir: Path
+    recipes_dir: Path  # J.15: reusable prompt recipes
     providers_file: Path
     settings_file: Path
     cron_db: Path
@@ -62,9 +63,11 @@ class EaccodePaths:
         object.__setattr__(self, "skills_dir", cfg / "skills")
         object.__setattr__(self, "plugins_dir", cfg / "plugins")
         object.__setattr__(self, "hooks_dir", cfg / "hooks")
+        object.__setattr__(self, "recipes_dir", cfg / "recipes")  # J.15
         object.__setattr__(self, "providers_file", cfg / "providers.yaml")
         object.__setattr__(self, "settings_file", cfg / "eaccode.yaml")
         object.__setattr__(self, "cron_db", dat / "cron.db")
         for d in (cfg, dat, cache, self.sessions_dir, self.memory_dir,
-                  self.skills_dir, self.plugins_dir, self.hooks_dir):
+                  self.skills_dir, self.plugins_dir, self.hooks_dir,
+                  self.recipes_dir):
             d.mkdir(parents=True, exist_ok=True)

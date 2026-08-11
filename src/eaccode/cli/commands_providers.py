@@ -89,3 +89,16 @@ def providers_set_default(name: str) -> None:
     print_success(f"✓ Default provider: {name}")
 
 
+@providers.command("catalog")
+def providers_catalog() -> None:
+    """J.25: known providers and their typical models."""
+    from eaccode.config.providers import NATIVE_LITELLM_PROVIDERS
+
+    print_info("Native LiteLLM providers:")
+    for p in sorted(NATIVE_LITELLM_PROVIDERS):
+        print_info(f"  {p}")
+    print_info("Custom OpenAI-compatible (own base_url):")
+    print_info("  opencode-go (https://opencode.ai/zen/go/v1), lmstudio, "
+               "ollama, vllm, groq, together, fireworks")
+
+

@@ -53,6 +53,17 @@ def search(query: str, limit: int = 5, provider: str = "ddg") -> list[SearchResu
         return []
 
 
+def _ssl_verify() -> bool:
+    """J.9: settings.ssl_verify (default True) for outbound HTTP."""
+    try:
+        from eaccode.config.paths import EaccodePaths
+        from eaccode.config.settings import Settings
+
+        return Settings.load(EaccodePaths().settings_file).ssl_verify
+    except Exception:
+        return True
+
+
 def _ddg_provider(query: str, limit: int) -> list[SearchResult]:
     import html as html_mod
 
@@ -60,6 +71,7 @@ def _ddg_provider(query: str, limit: int) -> list[SearchResult]:
         "https://html.duckduckgo.com/html/",
         params={"q": query},
         timeout=15,
+        verify=_ssl_verify(),  # J.9
         follow_redirects=True,
         headers={"User-Agent": "eaccode/0.1 (+https://github.com/Kurt-03/eac-code)"},
     )

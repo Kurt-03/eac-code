@@ -76,6 +76,7 @@ class Settings(BaseModel):
     request_timeout: float = Field(default=120.0, gt=0, description="F.36: per-request timeout (s)")
     max_turns: int = Field(default=50, ge=1, description="F.37: default turn budget")
     max_cost_usd: float | None = Field(default=None, ge=0, description="F.37: per-run cost cap")
+    ssl_verify: bool = Field(default=True, description="J.9: verify TLS certs for web tools")
 
     @classmethod
     def load(cls, path: Path) -> Settings:
