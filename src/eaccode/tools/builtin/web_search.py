@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from eaccode.tools.base import Tool, ToolContext, ToolResult
+from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 from eaccode.tools.web_search_registry import available_providers, search
 
 
@@ -23,7 +23,7 @@ class WebSearchTool(Tool):
     )
     input_model = WebSearchInput
     requires_permission = False
-    tool_class = None
+    tool_class = ToolClass.RUNAWAY  # network calls can be slow
 
     async def run(self, input: WebSearchInput, ctx: ToolContext) -> ToolResult:
         if input.provider not in available_providers():
