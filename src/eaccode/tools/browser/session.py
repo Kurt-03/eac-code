@@ -13,6 +13,7 @@ found the tool reports a clear setup hint instead of crashing.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import queue
 import shutil
