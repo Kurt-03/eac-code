@@ -414,12 +414,19 @@ def _cmd_skills(app, arg: str) -> CommandResult:
 
 
 def _cmd_compress(app, arg: str) -> CommandResult:
-    """/compress [here N] — manual context compaction (G.3)."""
+    """/compress [here N] — manual context compaction (F.15/F.16)."""
     from eaccode.agent.compaction import compact_messages
+    from eaccode.llm.tokens import count_message_tokens
 
     if not hasattr(app, "messages") or not app.messages:
         return CommandResult(message="Nothing to compress yet.")
     before = len(app.messages)
+    try:
+        tokens_before = count_message_tokens(
+            app.messages, app._model_name or "default"
+        )
+    except Exception:
+        tokens_before = None
     keep = None
     if arg.startswith("here "):
         try:
@@ -428,10 +435,20 @@ def _cmd_compress(app, arg: str) -> CommandResult:
             return CommandResult(message="Usage: /compress [here N]")
     app.messages = compact_messages(app.messages, keep_recent=keep or 5)
     after = len(app.messages)
-    return CommandResult(
-        message=f"Compressed: {before} → {after} messages"
-        + (" (keeping last user turns)" if keep else "")
-    )
+    feedback = f"Compressed: {before} → {after} messages"
+    # F.16: token feedback — how much context was actually freed.
+    if tokens_before is not None:
+        try:
+            tokens_after = count_message_tokens(
+                app.messages, app._model_name or "default"
+            )
+            saved = tokens_before - tokens_after
+            feedback += f" ({tokens_before} → {tokens_after} tokens, {saved} freed)"
+        except Exception:
+            pass
+    if keep:
+        feedback += " (keeping last user turns)"
+    return CommandResult(message=feedback)
 
 
 def _cmd_diff(app, arg: str) -> CommandResult:
