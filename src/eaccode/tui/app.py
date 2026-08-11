@@ -309,25 +309,39 @@ class EaccodeApp(App):
             log.write(write_warn(self._error))
             return
 
+        if self._busy:
+            log.write("[dim]still working — wait for the turn to finish, "
+                      "or press Ctrl+C[/dim]")
+            return
+
         self.messages.append({"role": "user", "content": text})
         self._last_prompt = text
         self._busy = True
-        try:
-            import asyncio
+        # v0.5.2 (CRITICAL): do NOT await the turn inside the event
+        # handler. Textual 8's message pump queues every key event while
+        # a handler is awaited, so permission keys (y/a/n/p/Esc) never
+        # reached the app while the agent was streaming — the "hängt
+        # einfach" bug since v0.3.0. Fire-and-forget: the handler
+        # returns immediately, the agent loop runs as its own task, and
+        # key events keep flowing.
+        import asyncio
 
-            self._current_task = asyncio.create_task(self._run_agent_streaming(log))
-            await self._current_task
-        except asyncio.CancelledError:
-            log.write("[yellow]⏹ run cancelled[/yellow]")
-        except Exception as e:
-            from eaccode.ui.messages import write_error
+        self._current_task = asyncio.create_task(self._run_agent_streaming(log))
 
-            log.write(write_error(f"Agent loop crashed: {e}"))
-        finally:
-            self._busy = False
-            self._current_task = None
-            # v0.4.0: spinner is now part of the Log — hide via the
-            # `_hide_spinner` path called from on_text / on_tool_result.
+        def _on_turn_done(task: asyncio.Task) -> None:
+            try:
+                task.result()  # re-raise to log the failure
+            except asyncio.CancelledError:
+                log.write("[yellow]⏹ run cancelled[/yellow]")
+            except Exception as e:
+                from eaccode.ui.messages import write_error
+
+                log.write(write_error(f"Agent loop crashed: {e}"))
+            finally:
+                self._busy = False
+                self._current_task = None
+
+        self._current_task.add_done_callback(_on_turn_done)
 
     def _ask_permission_async(self, tool_name: str, arguments: dict, question: str) -> object:
         """v0.4.0 (Phase B): inline permission question in the Log stream.

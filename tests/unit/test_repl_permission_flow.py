@@ -78,6 +78,82 @@ async def _wait_for(app, cond, tries=200):
 
 
 @pytest.mark.asyncio
+async def test_real_submit_path_keys_work_while_turn_runs(tmp_path):
+    """THE regression test for the v0.3.0-v0.5.1 hang.
+
+    Goes through the REAL on_input_submitted handler (pilot.press
+    'enter'), which previously awaited the whole turn — blocking all
+    further key events, so permission keys never arrived. After the
+    v0.5.2 fix the handler returns immediately and 'y' resolves the
+    pending permission while the turn streams in the background.
+    """
+    from textual.widgets import Input
+
+    from eaccode.ui.repl import EaccodeApp
+
+    app = EaccodeApp(workdir=tmp_path)
+    agent, client = _make_agent(tmp_path, app._ask_permission_async)
+    await _prepare_app(tmp_path, agent, app)
+
+    async with app.run_test() as pilot:
+        inp = app.query_one("#input", Input)
+        inp.value = "schreibe out.txt"
+        await pilot.press("enter")
+        # Handler must have returned immediately (turn runs in bg) —
+        # previously this press blocked until the whole turn finished.
+        assert app._busy is True
+        assert app._current_task is not None
+        assert await _wait_for(app, lambda: getattr(
+            app, "_pending_permission", None) is not None
+        ), "permission prompt never became pending"
+        assert app.query_one("#input", Input).disabled is False
+
+        await pilot.press("y")  # must resolve while the turn is running
+        assert await _wait_for(app, lambda: getattr(
+            app, "_pending_permission", None) is None
+        ), "permission never resolved after pressing y"
+        assert (tmp_path / "out.txt").read_text(
+            encoding="utf-8") == "permission-ok"
+
+        await pilot.pause(0.2)
+        assert app._busy is False  # turn finished, busy reset by callback
+        assert app.query_one("#input", Input).disabled is False
+        assert client.calls == 2  # tool call + final answer
+
+
+@pytest.mark.asyncio
+async def test_submit_while_busy_is_ignored(tmp_path):
+    """Submitting a second prompt while a turn runs must not spawn a
+    second agent loop (busy guard)."""
+    from textual.widgets import Input
+
+    from eaccode.ui.repl import EaccodeApp
+
+    app = EaccodeApp(workdir=tmp_path)
+    agent, client = _make_agent(tmp_path, app._ask_permission_async)
+    await _prepare_app(tmp_path, agent, app)
+
+    async with app.run_test() as pilot:
+        inp = app.query_one("#input", Input)
+        inp.value = "schreibe out.txt"
+        await pilot.press("enter")
+        assert app._busy is True
+        first_task = app._current_task
+        inp.value = "noch einer"
+        await pilot.press("enter")
+        assert app._current_task is first_task  # not replaced
+        assert client.calls == 1  # only the first turn streamed
+        # Resolve the pending permission so the turn can finish.
+        assert await _wait_for(app, lambda: getattr(
+            app, "_pending_permission", None) is not None
+        ), "permission never became pending"
+        await pilot.press("n")  # deny
+        assert await _wait_for(app, lambda: not app._busy,
+                               tries=300), "turn never finished"
+        assert app.query_one("#input", Input).disabled is False
+
+
+@pytest.mark.asyncio
 async def test_permission_key_y_writes_file_and_restores_input(tmp_path):
     from textual.widgets import Input
 
