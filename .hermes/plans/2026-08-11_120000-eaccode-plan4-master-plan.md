@@ -716,38 +716,38 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| F.1 Init-Reihenfolge/Profile | ⬜ | — |
-| F.7 Turn-Finalizer | ⬜ | — |
-| F.8 Runtime-Helpers | ⬜ | — |
-| F.9 turn_context | ⬜ | — |
-| F.10 turn_retry_state | ⬜ | — |
-| F.11 turn_summary | ⬜ | — |
-| F.12 iteration_budget | ⬜ | — |
-| F.13 runtime_cwd | ⬜ | — |
-| F.14 async_utils | ⬜ | — |
-| F.15 conversation_compression | ⬜ | — |
-| F.16 manual_compression_feedback | ⬜ | — |
-| F.17 @folder + @git | ⬜ | — |
-| F.18 Context-Grid | ⬜ | — |
-| F.19 message_sanitization | ⬜ | — |
-| F.20 reasoning_summaries | ⬜ | — |
-| F.21 thinking_timeout_guidance | ⬜ | — |
-| F.22 lmstudio_reasoning | ⬜ | — |
-| F.23 verification_evidence | ⬜ | — |
-| F.24 verify_on_stop | ⬜ | — |
-| F.25 redact erweitern | ⬜ | — |
-| F.26 replay_cleanup | ⬜ | — |
-| F.27 estop | ⬜ | — |
-| F.28 interrupt | ⬜ | — |
-| F.29 thread_scoped_silence | ⬜ | — |
-| F.30 AGENTS.md Parent-Chain | ⬜ | — |
-| F.31 prompt_caching | ⬜ | — |
-| F.32 error_classifier | ⬜ | — |
-| F.33 bounded_response | ⬜ | — |
-| F.34 native_compaction | ⬜ | — |
-| F.35 _cache | ⬜ | — |
-| F.36 timeouts | ⬜ | — |
-| F.37 budget_config | ⬜ | — |
+| F.1 Init-Reihenfolge/Profile | ✅ | `c7f1833` (EACCODE_CONFIG_DIR) |
+| F.7 Turn-Finalizer | ✅ | `645fe14` |
+| F.8 Runtime-Helpers | ✅ | `645fe14` |
+| F.9 turn_context | ✅ | `645fe14` |
+| F.10 turn_retry_state | ✅ | `645fe14` |
+| F.11 turn_summary | ✅ | `645fe14` (in F.20-Summary) |
+| F.12 iteration_budget | ✅ | `645fe14` |
+| F.13 runtime_cwd | ✅ | `645fe14` |
+| F.14 async_utils | ✅ | `645fe14` |
+| F.15 conversation_compression | ✅ | `895fa43` |
+| F.16 manual_compression_feedback | ✅ | `895fa43` |
+| F.17 @folder + @git | ✅ | `895fa43` (existierte in context_refs, verifiziert) |
+| F.18 Context-Grid | ✅ | `3b2ed8c` |
+| F.19 message_sanitization | ✅ | `3b2ed8c` |
+| F.20 reasoning_summaries | ✅ | `3b2ed8c` |
+| F.21 thinking_timeout_guidance | ✅ | `3b2ed8c` |
+| F.22 lmstudio_reasoning | ✅ | `3b2ed8c` |
+| F.23 verification_evidence | ✅ | `75ac1b3` |
+| F.24 verify_on_stop | ✅ | `75ac1b3` |
+| F.25 redact erweitern | ✅ | `75ac1b3` |
+| F.26 replay_cleanup | ✅ | `75ac1b3` |
+| F.27 estop | ✅ | `75ac1b3` |
+| F.28 interrupt | ✅ | `75ac1b3` |
+| F.29 thread_scoped_silence | ✅ | `b403e52` |
+| F.30 AGENTS.md Parent-Chain | ✅ | `b403e52` (existierte in project.py, verifiziert) |
+| F.31 prompt_caching | ✅ | `b403e52` |
+| F.32 error_classifier | ✅ | `b403e52` |
+| F.33 bounded_response | ✅ | `b403e52` |
+| F.34 native_compaction | ✅ | `b403e52` (nutzt model_context_window, verifiziert) |
+| F.35 _cache | ✅ | `b403e52` (cache_dir + prompt_cache_max) |
+| F.36 timeouts | ✅ | `b403e52` |
+| F.37 budget_config | ✅ | `b403e52` |
 
 ### Phase G — Cron/Process/Vision/Web
 
