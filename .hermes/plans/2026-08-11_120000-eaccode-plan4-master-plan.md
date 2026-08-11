@@ -767,33 +767,33 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| H.1 redact_tool_args_for_display | ⬜ | — |
-| H.2 Argument-Canonicalizer | ⬜ | — |
-| H.3 ToolClass-Audit | ⬜ | — |
-| H.4 file_safety-Klassen | ⬜ | — |
-| H.5 markdown_tables | ⬜ | — |
-| H.6 image_routing | ⬜ | — |
-| H.7 flatten_message_text | ⬜ | — |
-| H.8 sizefmt + timefmt | ⬜ | — |
-| H.9 Clipboard-Bilder | ⬜ | — |
-| H.10 File-Ops-Feinschliff | ⬜ | — |
-| H.11 url_safety | ⬜ | — |
-| H.12 working_diff | ⬜ | — |
-| H.13 patch_parser | ⬜ | — |
-| H.14 ansi_strip | ⬜ | — |
-| H.15 lazy_deps | ⬜ | — |
-| H.16 schema_sanitizer | ⬜ | — |
-| H.17 tool_search | ⬜ | — |
-| H.18 tool_output_limits | ⬜ | — |
-| H.19 tool_result_storage | ⬜ | — |
-| H.20 self_repo_guard | ⬜ | — |
-| H.21 threat_patterns | ⬜ | — |
-| H.22 credential_files | ⬜ | — |
-| H.23 execute_code-Caps | ⬜ | — |
-| H.24 Browser-Feinschliff | ⬜ | — |
-| H.25 computer_use-Schema | ⬜ | — |
-| H.26 image_source | ⬜ | — |
-| H.27 checkpoint_manager | ⬜ | — |
+| H.1 redact_tool_args_for_display | ✅ | `af85e46` |
+| H.2 Argument-Canonicalizer | ✅ | `af85e46` |
+| H.3 ToolClass-Audit | ✅ | `76731a2` (Guardrail-Test deckt alle Builtins) |
+| H.4 file_safety-Klassen | ✅ | `af85e46` (existierte in safety.py, erweitert) |
+| H.5 markdown_tables | ✅ | `af85e46` |
+| H.6 image_routing | ✅ | Verifikation (vision-Tools existieren) |
+| H.7 flatten_message_text | ✅ | Verifikation (extract_text in runtime_helpers) |
+| H.8 sizefmt + timefmt | ✅ | `af85e46` |
+| H.9 Clipboard-Bilder | ⬜ | offen — braucht PIL (optionale Dep), bewusst zurückgestellt |
+| H.10 File-Ops-Feinschliff | ✅ | Verifikation (checkpoints/Locks existieren) |
+| H.11 url_safety | ✅ | `af85e46` |
+| H.12 working_diff | ✅ | Verifikation (/diff + diff_cmd existieren) |
+| H.13 patch_parser | ✅ | `f8bd8bd` (V4A, neu) |
+| H.14 ansi_strip | ✅ | Verifikation (executor.strip_ansi) |
+| H.15 lazy_deps | ✅ | Verifikation (trafilatura lazy in web_extract) |
+| H.16 schema_sanitizer | ✅ | `af85e46` |
+| H.17 tool_search | ✅ | `af85e46` |
+| H.18 tool_output_limits | ✅ | Verifikation (cap_output existiert) |
+| H.19 tool_result_storage | ✅ | `af85e46` (Spill >50K) |
+| H.20 self_repo_guard | ✅ | `af85e46` |
+| H.21 threat_patterns | ✅ | `af85e46` |
+| H.22 credential_files | ✅ | `af85e46` (safety.py erweitert) |
+| H.23 execute_code-Caps | ✅ | Verifikation (5-min-Cap + Timeout existieren) |
+| H.24 Browser-Feinschliff | ✅ | Verifikation (browser-Tests grün) |
+| H.25 computer_use-Schema | ✅ | Verifikation (cua.py + Tests) |
+| H.26 image_source | ✅ | Verifikation (vision-Tool-Source-Handling) |
+| H.27 checkpoint_manager | ✅ | Verifikation (checkpoints.py + Tests) |
 
 ### Phase J — P1-Rest (J.1–J.54, gebündelt)
 
