@@ -650,6 +650,10 @@ class EaccodeApp(App):
         from eaccode.tools.builtin.delegate import cancel_all_background
 
         cancel_all_background()
+        # G.2/G.3: kill parked processes + daemons on exit.
+        from eaccode.tools.process_registry import kill_all
+
+        kill_all()
         # D.2/D.8: final save + lease release.
         self._save_session()
         self._release_session()

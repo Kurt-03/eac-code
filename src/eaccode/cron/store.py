@@ -33,6 +33,7 @@ class CronJob:
     last_output: str = ""
     context_from: list[str] = field(default_factory=list)
     deliver: str = "origin"
+    no_agent: bool = False  # G.5: script-only watchdog jobs (no LLM)
     created_at: str = ""
     updated_at: str = ""
 
@@ -64,11 +65,19 @@ class JobStore:
                     last_output TEXT NOT NULL DEFAULT '',
                     context_from TEXT NOT NULL DEFAULT '[]',
                     deliver TEXT NOT NULL DEFAULT 'origin',
+                    no_agent INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
                 """
             )
+            # G.5: migration for databases created before `no_agent`.
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(cron_jobs)")}
+            if "no_agent" not in cols:
+                conn.execute(
+                    "ALTER TABLE cron_jobs ADD COLUMN no_agent INTEGER "
+                    "NOT NULL DEFAULT 0"
+                )
 
     # ------------------------------------------------------------- helpers
 
@@ -87,9 +96,9 @@ class JobStore:
             last_output=row["last_output"],
             context_from=json.loads(row["context_from"] or "[]"),
             deliver=row["deliver"],
+            no_agent=bool(row["no_agent"]) if "no_agent" in row.keys() else False,  # noqa: SIM118
             created_at=row["created_at"], updated_at=row["updated_at"],
         )
-
     # -------------------------------------------------------------- CRUD
 
     def create(self, job: CronJob) -> str:
@@ -101,13 +110,13 @@ class JobStore:
             conn.execute(
                 "INSERT INTO cron_jobs (id, name, schedule, prompt, skills, script, "
                 "enabled, repeat, next_run_at, last_run_at, last_status, last_output, "
-                "context_from, deliver, created_at, updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "context_from, deliver, no_agent, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (job.id, job.name, job.schedule, job.prompt,
                  json.dumps(job.skills), job.script, int(job.enabled),
                  job.repeat, job.next_run_at, job.last_run_at, job.last_status,
                  job.last_output, json.dumps(job.context_from), job.deliver,
-                 job.created_at, job.updated_at),
+                 int(job.no_agent), job.created_at, job.updated_at),
             )
         return job.id
 
@@ -139,12 +148,12 @@ class JobStore:
                 "UPDATE cron_jobs SET name=?, schedule=?, prompt=?, skills=?, "
                 "script=?, enabled=?, repeat=?, next_run_at=?, last_run_at=?, "
                 "last_status=?, last_output=?, context_from=?, deliver=?, "
-                "updated_at=? WHERE id=?",
+                "no_agent=?, updated_at=? WHERE id=?",
                 (job.name, job.schedule, job.prompt, json.dumps(job.skills),
                  job.script, int(job.enabled), job.repeat, job.next_run_at,
                  job.last_run_at, job.last_status, job.last_output,
-                 json.dumps(job.context_from), job.deliver, job.updated_at,
-                 job.id),
+                 json.dumps(job.context_from), job.deliver, int(job.no_agent),
+                 job.updated_at, job.id),
             )
         return cur.rowcount > 0
 

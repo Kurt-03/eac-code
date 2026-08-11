@@ -68,9 +68,15 @@ class _ProcessRegistry:
 
     def __init__(self) -> None:
         self._processes: dict[str, ManagedProcess] = {}
+        self._pty_masters: dict[str, int] = {}  # G.1: key -> master fd
 
     def spawn(self, key: str, command: str, cwd: Path | None = None,
-              env: dict[str, str] | None = None) -> ManagedProcess:
+              env: dict[str, str] | None = None, pty: bool = False) -> ManagedProcess:
+        """G.1: pty=True allocates a pseudo-terminal (POSIX only).
+
+        Windows raises ValueError — the caller surfaces it as a tool
+        error with a hint instead of crashing.
+        """
         kwargs: dict = {
             "shell": True,
             "stdout": subprocess.PIPE,
@@ -83,7 +89,23 @@ class _ProcessRegistry:
             "env": {**os.environ, **(env or {})},
             "creationflags": windows_detach_flags(),
         }
-        if not IS_WINDOWS:
+        if pty:
+            if IS_WINDOWS:
+                raise ValueError(
+                    "PTY spawn is not supported on Windows — use pty=False"
+                )
+            master_fd, slave_fd = os.openpty()
+            kwargs["stdin"] = slave_fd
+            kwargs["stdout"] = slave_fd
+            kwargs["stderr"] = slave_fd
+            kwargs.pop("text", None)
+            kwargs.pop("encoding", None)
+            kwargs.pop("errors", None)
+            kwargs.pop("shell", None)
+            kwargs["shell"] = True
+            kwargs["start_new_session"] = True
+            self._pty_masters[key] = master_fd
+        if not IS_WINDOWS and not pty:
             kwargs["start_new_session"] = True
         proc = subprocess.Popen(command, **kwargs)
         managed = ManagedProcess(
@@ -121,6 +143,7 @@ class ProcessInput(BaseModel):
     key: str = Field(default="", description="Process registry key (name)")
     command: str = Field(default="", description="Shell command (spawn only)")
     timeout: float = Field(default=2.0, description="Poll wait seconds")
+    pty: bool = Field(default=False, description="G.1: allocate a PTY (POSIX only)")
 
 
 class ProcessTool(Tool):
@@ -142,8 +165,13 @@ class ProcessTool(Tool):
         if action == "spawn":
             if not input.command:
                 return ToolResult(content="spawn requires a command", is_error=True)
-            managed = self._registry.spawn(input.key or "default", input.command,
-                                           cwd=ctx.workdir, env=ctx.env)
+            try:
+                managed = self._registry.spawn(
+                    input.key or "default", input.command,
+                    cwd=ctx.workdir, env=ctx.env, pty=input.pty,
+                )
+            except ValueError as e:
+                return ToolResult(content=str(e), is_error=True)
             return ToolResult(
                 content=f"Started '{input.command}' as '{managed.name}' (pid {managed.pid})"
             )

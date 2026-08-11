@@ -30,6 +30,11 @@ class CronjobInput(BaseModel):
     skills: list[str] = Field(default_factory=list, description="Skills to load for the job")
     enabled_toolsets: list[str] = Field(default_factory=list, description="Toolset restriction")
     deliver: str = Field(default="origin", description="Delivery target")
+    no_agent: bool = Field(
+        default=False,
+        description="G.5: script-only watchdog — run the script directly "
+                    "and deliver its stdout (no LLM). Requires script.",
+    )
 
 
 class CronjobTool(Tool):
@@ -78,6 +83,11 @@ class CronjobTool(Tool):
             )
         if not input.prompt and not input.script:
             return ToolResult(content="create requires a prompt or a script", is_error=True)
+        if input.no_agent and not input.script:
+            return ToolResult(
+                content="no_agent jobs require a script (the LLM is skipped)",
+                is_error=True,
+            )
         if parse_schedule(input.schedule) is None:
             return ToolResult(content=f"Invalid schedule: {input.schedule}", is_error=True)
         now = datetime.now().isoformat(timespec="seconds")
@@ -87,7 +97,8 @@ class CronjobTool(Tool):
             schedule=input.schedule, prompt=input.prompt,
             script=input.script, skills=input.skills, repeat=input.repeat,
             next_run_at=nxt.isoformat(timespec="seconds") if nxt else None,
-            deliver=input.deliver, created_at=now, updated_at=now,
+            deliver=input.deliver, no_agent=input.no_agent,
+            created_at=now, updated_at=now,
         )
         job_id = self._store.create(job)
         return ToolResult(
@@ -167,10 +178,28 @@ class CronjobTool(Tool):
         )
 
     async def _default_runner(self, job: CronJob) -> tuple[str, str]:
-        """Headless run via the CLI (works without a running REPL)."""
+        """Headless run via the CLI (works without a running REPL).
+
+        G.5: ``no_agent`` jobs run their script directly and deliver its
+        stdout verbatim — no LLM, no tokens (watchdog pattern).
+        """
         import subprocess
         import sys
 
+        if job.no_agent:
+            if not job.script:
+                return "error", "no_agent job requires a script"
+            try:
+                proc = subprocess.run(
+                    [sys.executable, job.script],
+                    capture_output=True, text=True, timeout=600,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                if proc.returncode == 0:
+                    return "success", proc.stdout.strip()[:50_000]
+                return "error", (proc.stderr or proc.stdout).strip()[:50_000]
+            except Exception as e:
+                return "error", f"{type(e).__name__}: {e}"
         try:
             cmd = [sys.executable, "-m", "eaccode", "run", "--print", "--prompt", job.prompt]
             if job.script:
