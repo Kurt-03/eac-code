@@ -265,7 +265,12 @@ class EaccodeApp(App):
         from eaccode.ui.permission_modal import PermissionModal
 
         future: asyncio.Future = asyncio.get_running_loop().create_future()
-        modal = PermissionModal(tool_name, arguments, question, resolve=future.set_result)
+        # H.1: redacted + canonicalized arguments for the permission modal.
+        from eaccode.security.guards import display_arguments
+
+        display_args = display_arguments(tool_name, arguments, self.workdir)
+        modal = PermissionModal(tool_name, display_args, question,
+                                resolve=future.set_result)
         self.push_screen(modal)
         # B.4: register the ask so /approve <id> / /deny <id> can resolve
         # it while the modal is open (or after the fact).

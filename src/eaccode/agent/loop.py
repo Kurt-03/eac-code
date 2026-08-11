@@ -178,9 +178,17 @@ class AgentLoop:
                 # F.19: sanitize credential-like strings before the model
                 # sees the tool result (mirrors the session-save redaction).
                 # F.23: errors carry an explicit evidence marker.
+                # H.21: prompt-injection patterns get a warning marker.
+                from eaccode.security.guards import detect_injection
                 from eaccode.security.redact import redact_secrets
 
                 content = redact_secrets(result.content)
+                injections = detect_injection(content)
+                if injections:
+                    content = (
+                        "[injection-warning: tool output contains "
+                        "instruction-like text] " + content
+                    )
                 if result.is_error:
                     content = f"[tool error: {tc.name}] {content}"
                 messages.append(
@@ -356,9 +364,17 @@ class AgentLoop:
                 result = await self._execute_guarded(tc, ctx)
                 # F.19: sanitize credential-like strings for the model.
                 # F.23: errors carry an explicit evidence marker.
+                # H.21: prompt-injection patterns get a warning marker.
+                from eaccode.security.guards import detect_injection
                 from eaccode.security.redact import redact_secrets
 
                 content = redact_secrets(result.content)
+                injections = detect_injection(content)
+                if injections:
+                    content = (
+                        "[injection-warning: tool output contains "
+                        "instruction-like text] " + content
+                    )
                 if result.is_error:
                     content = f"[tool error: {tc.name}] {content}"
                 messages.append(

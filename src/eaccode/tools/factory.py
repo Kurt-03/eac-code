@@ -72,6 +72,7 @@ def _all_tools() -> list[Tool]:
     from eaccode.tools.builtin.read import ReadTool
     from eaccode.tools.builtin.search_files import SearchFilesTool
     from eaccode.tools.builtin.todo import TodoWriteTool
+    from eaccode.tools.builtin.tool_search import ToolSearchTool
     from eaccode.tools.builtin.vision import VideoAnalyzeTool, VisionAnalyzeTool
     from eaccode.tools.builtin.web_extract import WebExtractTool
     from eaccode.tools.builtin.web_search import WebSearchTool
@@ -101,6 +102,7 @@ def _all_tools() -> list[Tool]:
         SearchFilesTool(),
         WebExtractTool(),
         WebSearchTool(),  # G.6
+        ToolSearchTool(),  # H.17
         ProcessTool(),
         VisionAnalyzeTool(),
         VideoAnalyzeTool(),
@@ -147,4 +149,8 @@ def build_default_registry(
 
     for tool in tools:
         reg.register(tool)
+    # H.17: the tool_search lookup sees the final registry.
+    from eaccode.tools.builtin.tool_search import set_registry_lookup
+
+    set_registry_lookup(lambda: reg)
     return reg

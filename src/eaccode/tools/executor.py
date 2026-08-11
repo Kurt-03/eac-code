@@ -15,6 +15,23 @@ MAX_OUTPUT_CHARS = 50_000
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
 
+def _spill_result(tool_name: str, content: str) -> str | None:
+    """H.19: write oversized output to cache; returns the file path."""
+    import time
+    from uuid import uuid4
+
+    from eaccode.config.paths import EaccodePaths
+
+    try:
+        spill_dir = EaccodePaths().cache_dir / "tool_results"
+        spill_dir.mkdir(parents=True, exist_ok=True)
+        dest = spill_dir / f"{tool_name}-{int(time.time())}-{uuid4().hex[:6]}.txt"
+        dest.write_text(content, encoding="utf-8", errors="replace")
+        return str(dest)
+    except Exception:
+        return None
+
+
 def strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text)
 
@@ -66,6 +83,17 @@ class ToolExecutor:
         # ANSI strip + output cap (Phase A.3): keep the context window safe
         if result.content:
             result.content = cap_output(strip_ansi(result.content))
+        # H.19: oversized results spill to disk — the context keeps a
+        # reference instead of the payload (the model can read it back
+        # with the read tool when needed).
+        if result.content and len(result.content) >= MAX_OUTPUT_CHARS:
+            spilled = _spill_result(name, result.content)
+            if spilled:
+                result.content = (
+                    f"[result spilled to {spilled} — {MAX_OUTPUT_CHARS}+ "
+                    "chars; read the file for the full output]"
+                )
+                result.metadata["spilled_to"] = spilled
         return result
 
     async def execute_parallel(

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_BLOCKED_FILENAMES = {".env", "providers.yaml", "credentials", "secrets.txt"}
+_BLOCKED_FILENAMES = {".env", "providers.yaml", "credentials", "secrets.txt",
+                      "allowlist.json", "mcp.yaml"}
 _BLOCKED_SUFFIXES = {".pem", ".key", ".p12"}
 
 
@@ -17,7 +18,11 @@ def _eaccode_dirs() -> set[Path]:
     from eaccode.config.paths import EaccodePaths
 
     p = EaccodePaths()
-    return {p.config_dir, p.data_dir, p.cache_dir}
+    dirs = {p.config_dir, p.data_dir, p.cache_dir}
+    # H.20: the eaccode package itself (site-packages or repo src/) —
+    # the agent must not rewrite its own implementation.
+    dirs.add(Path(__file__).resolve().parent.parent)
+    return dirs
 
 
 def is_write_denied(path: Path) -> Path | None:
