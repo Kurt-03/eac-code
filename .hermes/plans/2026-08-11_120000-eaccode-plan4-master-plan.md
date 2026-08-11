@@ -813,8 +813,15 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| K.1 Gesamt-Suite + Ruff | ⬜ | — |
-| K.2 README + docs/ | ⬜ | — |
-| K.3 CHANGELOG | ⬜ | — |
-| K.4 Push + Tag v0.3.0 | ⬜ | — |
+| K.1 Gesamt-Suite + Ruff | ✅ | 802 passed, 1 skipped, 2 deselected · Ruff „All checks passed!" |
+| K.2 README + docs/ | ✅ | `b762a38` (README-Feature-Update) |
+| K.3 CHANGELOG | ✅ | `b762a38` (CHANGELOG v0.3.0) |
+| K.4 Push + Tag v0.3.0 | ✅ | `b762a38` + Tag `v0.3.0` auf origin |
+
+---
+
+**Masterplan abgeschlossen:** Phasen A–K abgearbeitet · 802 Tests grün · Tag v0.3.0.
+Bewusst offen (dokumentiert): H.9 Clipboard-Bilder (PIL), G.9 MCP-Server,
+J.1/J.3/J.5/J.7/J.8/J.10–J.12/J.16/J.20/J.26/J.28/J.29/J.38/J.39/J.43/J.45/J.48–J.54
+(optional/extern).
 
