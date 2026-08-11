@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from eaccode.cli import main
+from eaccode.cli._output import print_error, print_info, print_success, print_warn
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.providers import load_providers
 from eaccode.config.settings import PermissionMode, Settings
@@ -23,7 +24,7 @@ def config_show() -> None:
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
     for k, v in settings.model_dump(mode="json").items():
-        click.echo(f"  {k:24s} {v}")
+        print_info(f"  {k:24s} {v}")
 
 
 @config.command("set")
@@ -34,17 +35,17 @@ def config_set(key: str, value: str) -> None:
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
     if key not in Settings.model_fields:
-        click.echo(f"✗ Unknown setting: {key}. Known: {', '.join(Settings.model_fields)}")
+        print_error(f"✗ Unknown setting: {key}. Known: {', '.join(Settings.model_fields)}")
         raise SystemExit(1) from None
     # Pydantic validates itself (enum, int, bool, float, constraints like ge=1)
     try:
         updated = Settings.model_validate({**settings.model_dump(), key: value})
     except Exception as e:
-        click.echo(f"✗ Invalid value for {key}: {value} ({e})")
+        print_error(f"✗ Invalid value for {key}: {value} ({e})")
         raise SystemExit(1) from None
     updated.save(paths.settings_file)
     value_out = getattr(updated, key)
-    click.echo(f"✓ {key} = {value_out.value if hasattr(value_out, 'value') else value_out}")
+    print_success(f"✓ {key} = {value_out.value if hasattr(value_out, 'value') else value_out}")
 
 
 @main.command("run")
@@ -71,7 +72,7 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
     paths = EaccodePaths()
     settings = Settings.load(paths.settings_file)
     if not load_providers(paths.providers_file):
-        click.echo(
+        print_info(
             "No providers configured. Add one first:\n"
             "  eaccode providers add --provider minimax --model MiniMax-M3"
         )
@@ -95,7 +96,7 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
 
         mcp_tools, _ = _asyncio.run(connect_mcp_tools(paths.config_dir / "mcp.yaml"))
     except Exception as e:
-        click.echo(f"Warning: MCP servers failed to load: {e}", err=True)
+        print_warn(f"Warning: MCP servers failed to load: {e}")
 
     agent, _, _ = build_agent(
         Path.cwd(),
@@ -111,11 +112,11 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
     try:
         result = asyncio.run(agent.run([Message.user(prompt)]))
     except MaxTurnsExceededError as e:
-        click.echo(f"Error: {e}", err=True)
+        print_error(f"Error: {e}")
         raise SystemExit(1) from None
 
     if output_format == "json":
-        click.echo(jsonlib.dumps({
+        print_info(jsonlib.dumps({
             "result": result.final_text,
             "turns": result.turns,
             "cost_usd": round(result.cost_usd, 4),
@@ -125,6 +126,6 @@ def run_cmd(prompt: str, print_mode: bool, output_format: str, max_turns: int | 
             },
         }))
     else:
-        click.echo(result.final_text)
+        print_info(result.final_text)
 
 

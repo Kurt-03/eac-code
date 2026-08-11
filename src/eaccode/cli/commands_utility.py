@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from eaccode.cli import main
+from eaccode.cli._output import print_error, print_info, print_success
 from eaccode.cli.commands_config import config
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.providers import load_providers
@@ -21,15 +22,15 @@ def doctor() -> None:
 
     def check(ok: bool, msg: str) -> None:
         nonlocal problems
-        click.echo(f"  {'✓' if ok else '✗'} {msg}")
+        print_info(f"  {'✓' if ok else '✗'} {msg}")
         if not ok:
             problems += 1
 
-    click.echo("eaccode doctor")
+    print_info("eaccode doctor")
     providers = load_providers(paths.providers_file)
     check(bool(providers), f"providers configured ({len(providers)})")
     for p in providers:
-        click.echo(f"      {p.name:14s} {p.model}")
+        print_info(f"      {p.name:14s} {p.model}")
     settings = Settings.load(paths.settings_file)
     check(settings.permission_mode.value in ("default", "acceptEdits", "plan", "bypassPermissions"),
           f"settings loadable (mode={settings.permission_mode.value})")
@@ -47,9 +48,9 @@ def doctor() -> None:
     check(len(mcp_configs) >= 0, f"mcp.yaml ({len(mcp_configs)} server(s) configured)")
 
     if problems:
-        click.echo(f"\n{problems} issue(s) found.")
+        print_info(f"\n{problems} issue(s) found.")
         raise SystemExit(1)
-    click.echo("\nAll checks passed.")
+    print_info("\nAll checks passed.")
 
 
 # ------------------------------------------------------------------ models
@@ -68,12 +69,12 @@ def models_list() -> None:
     mapper = ThinkingMapper()
     providers_list = load_providers(paths.providers_file)
     if not providers_list:
-        click.echo("No providers configured.")
+        print_info("No providers configured.")
         return
     for p in providers_list:
         litellm_id = p.litellm_model(p.model)
         thinking = mapper.supports_thinking(litellm_id)
-        click.echo(
+        print_info(
             f"  {p.name:14s} {p.model:30s} thinking={'✓' if thinking else '✗'}  "
             f"({litellm_id})"
         )
@@ -94,10 +95,10 @@ def skills_list() -> None:
     paths = EaccodePaths()
     installed = discover_skills([paths.skills_dir])
     if not installed:
-        click.echo(f"No skills installed. Put .md files in {paths.skills_dir}")
+        print_info(f"No skills installed. Put .md files in {paths.skills_dir}")
         return
     for s in installed:
-        click.echo(f"  {s.name:25s} {s.description}")
+        print_info(f"  {s.name:25s} {s.description}")
 
 
 @skills.command("add")
@@ -111,14 +112,14 @@ def skills_add(path: str) -> None:
     paths = EaccodePaths()
     src = Path(path)
     if not src.exists():
-        click.echo(f"✗ File not found: {src}")
+        print_error(f"✗ File not found: {src}")
         raise SystemExit(1)
     meta, _ = _parse_frontmatter(src.read_text(encoding="utf-8"))
     name = meta.get("name") or src.stem
     paths.skills_dir.mkdir(parents=True, exist_ok=True)
     dest = paths.skills_dir / f"{name}.md"
     shutil.copy2(src, dest)
-    click.echo(f"✓ Skill '{name}' installed at {dest}")
+    print_success(f"✓ Skill '{name}' installed at {dest}")
 
 
 # --------------------------------------------------------------- config init
@@ -137,7 +138,7 @@ def config_init() -> None:
             "## Conventions\n- (add style/code conventions here)\n",
             encoding="utf-8",
         )
-    click.echo(f"✓ Created {ctx_file}")
-    click.echo(f"✓ Created {dot_dir} (put project skills here)")
+    print_success(f"✓ Created {ctx_file}")
+    print_success(f"✓ Created {dot_dir} (put project skills here)")
 
 

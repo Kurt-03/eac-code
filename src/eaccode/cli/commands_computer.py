@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import click
 
+from eaccode.cli._output import print_info
 from eaccode.tools import cua_install
 
 
@@ -18,19 +19,19 @@ def computer_status() -> None:
     status = cua_install.driver_status()
     if status["installed"]:
         version = f" (v{status['version']})" if status["version"] else ""
-        click.echo(f"cua-driver: {status['path']}{version}")
+        print_info(f"cua-driver: {status['path']}{version}")
     else:
-        click.echo("cua-driver: not installed — run `eaccode computer install`")
+        print_info("cua-driver: not installed — run `eaccode computer install`")
 
 
 @computer.command(name="install")
 def computer_install() -> None:
     """Install cua-driver via the platform package manager."""
-    click.echo(cua_install.install_cua_driver())
+    print_info(cua_install.install_cua_driver())
     if cua_install.driver_status()["installed"]:
-        click.echo("Installation verified.")
+        print_info("Installation verified.")
     else:
-        click.echo("Installation not verified yet — set EACCODE_CUA_DRIVER if needed.")
+        print_info("Installation not verified yet — set EACCODE_CUA_DRIVER if needed.")
 
 
 @computer.command(name="doctor")
@@ -38,7 +39,7 @@ def computer_doctor() -> None:
     """Run diagnostics and repair the Windows autostart service."""
     findings = cua_install.doctor()
     if not findings:
-        click.echo("All checks passed.")
+        print_info("All checks passed.")
         return
     for line in findings:
-        click.echo(line)
+        print_info(line)

@@ -4,6 +4,7 @@ from __future__ import annotations
 import click
 
 from eaccode.cli import main
+from eaccode.cli._output import print_error, print_info, print_success
 from eaccode.config.paths import EaccodePaths
 
 # ------------------------------------------------------------------ sessions
@@ -25,7 +26,7 @@ def sessions_list(limit: int) -> None:
     store = SessionStore(paths.sessions_dir / "sessions.db")
     for s in asyncio.run(store.list_sessions(limit=limit)):
         cwd = s.metadata.get("cwd", "")
-        click.echo(f"  {s.id[:12]}  {s.title:40s} {s.updated_at[:19]}  {cwd}")
+        print_info(f"  {s.id[:12]}  {s.title:40s} {s.updated_at[:19]}  {cwd}")
 
 
 @sessions.command("search")
@@ -40,8 +41,8 @@ def sessions_search(query: str) -> None:
     paths = EaccodePaths()
     store = SessionStore(paths.sessions_dir / "sessions.db")
     for h in asyncio.run(search_sessions(store, query)):
-        click.echo(f"  [{h.title}] {h.session_id}")
-        click.echo(f"    {h.snippet}")
+        print_info(f"  [{h.title}] {h.session_id}")
+        print_info(f"    {h.snippet}")
 
 
 @sessions.command("delete")
@@ -55,6 +56,9 @@ def sessions_delete(session_id: str) -> None:
     paths = EaccodePaths()
     store = SessionStore(paths.sessions_dir / "sessions.db")
     ok = asyncio.run(store.delete(session_id))
-    click.echo("✓ deleted" if ok else "✗ session not found")
+    if ok:
+        print_success("✓ deleted")
+    else:
+        print_error("✗ session not found")
 
 

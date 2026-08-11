@@ -6,6 +6,7 @@ import asyncio
 
 import click
 
+from eaccode.cli._output import print_info
 from eaccode.config.paths import EaccodePaths
 from eaccode.cron.scheduler import Scheduler
 from eaccode.cron.store import JobStore
@@ -33,16 +34,16 @@ def cron_run(once: bool, tick: float) -> None:
         if once:
             executed = await sched.tick_once()
             for job in executed:
-                click.echo(f"{job.id}: {job.last_status}")
+                print_info(f"{job.id}: {job.last_status}")
         else:
-            click.echo(f"eaccode cron: watching {paths.cron_db} "
+            print_info(f"eaccode cron: watching {paths.cron_db} "
                        f"(tick {tick}s, Ctrl+C to stop)")
             await sched.run_forever()
 
     try:
         asyncio.run(_run())
     except KeyboardInterrupt:
-        click.echo("\nStopped.")
+        print_info("\nStopped.")
 
 
 @cron_group.command("list")
@@ -52,11 +53,11 @@ def cron_list() -> None:
     store = JobStore(paths.cron_db)
     jobs = store.list()
     if not jobs:
-        click.echo("No cron jobs. Create one in the REPL with the cronjob tool.")
+        print_info("No cron jobs. Create one in the REPL with the cronjob tool.")
         return
     for j in jobs:
         state = "enabled" if j.enabled else "PAUSED"
-        click.echo(
+        print_info(
             f"{j.id}: {j.name} [{state}] schedule={j.schedule} "
             f"last={j.last_status}"
         )
@@ -70,4 +71,4 @@ def cron_clear() -> None:
     store = JobStore(paths.cron_db)
     for job in store.list():
         store.delete(job.id)
-    click.echo("All cron jobs removed.")
+    print_info("All cron jobs removed.")

@@ -1,9 +1,8 @@
 """CLI sub-commands — registered onto the main click group on import."""
 from __future__ import annotations
 
-import click
-
 from eaccode.cli import main
+from eaccode.cli._output import print_info
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.settings import Settings
 
@@ -72,8 +71,8 @@ def curator_run() -> None:
 
     report_path = paths.data_dir / "curator_report.md"
     report_path.write_text("\n".join(report) + "\n", encoding="utf-8")
-    click.echo("\n".join(report))
-    click.echo(f"\nReport saved: {report_path}")
+    print_info("\n".join(report))
+    print_info(f"\nReport saved: {report_path}")
 
 
 @curator.command("report")
@@ -82,8 +81,8 @@ def curator_report() -> None:
     paths = EaccodePaths()
     report = paths.data_dir / "curator_report.md"
     if not report.exists():
-        click.echo("No report yet. Run `eaccode curator run` first.")
+        print_info("No report yet. Run `eaccode curator run` first.")
         return
-    click.echo(report.read_text(encoding="utf-8"))
+    print_info(report.read_text(encoding="utf-8"))
 
 

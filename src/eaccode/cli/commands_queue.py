@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from eaccode.cli import main
+from eaccode.cli._output import print_error, print_info, print_success
 from eaccode.config.paths import EaccodePaths
 from eaccode.config.settings import Settings
 
@@ -30,13 +31,13 @@ def queue_status() -> None:
     counts: dict[str, int] = {}
     for j in jobs:
         counts[j.status.value] = counts.get(j.status.value, 0) + 1
-    click.echo(
+    print_info(
         f"pool: max {settings.max_parallel_agents} concurrent  |  "
         + "  ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
     )
     icons = {"queued": "⏳", "running": "▶", "done": "✓", "failed": "✗"}
     for j in jobs[:15]:
-        click.echo(
+        print_info(
             f"  {icons.get(j.status.value, '?')} {j.id[:8]}  {j.name:22s} "
             f"{j.status.value:7s} ${j.cost_usd:.3f}  {j.created_at[:19]}"
         )
@@ -53,11 +54,11 @@ def queue_show(job_id: str) -> None:
     paths = EaccodePaths()
     queue = JobQueue(paths.data_dir / "queue.db")
     job = asyncio.run(queue.get(job_id))
-    click.echo(f"# {job.name} ({job.status.value})\n")
+    print_info(f"# {job.name} ({job.status.value})\n")
     if job.report:
-        click.echo(job.report)
+        print_info(job.report)
     if job.error:
-        click.echo(f"[error] {job.error}")
+        print_info(f"[error] {job.error}")
 
 
 @queue_cmd.command("add")
@@ -72,7 +73,7 @@ def queue_add(prompt: str, name: str) -> None:
     paths = EaccodePaths()
     queue = JobQueue(paths.data_dir / "queue.db")
     job_id = asyncio.run(queue.enqueue(name=name, prompt=prompt, workdir=str(Path.cwd())))
-    click.echo(f"✓ enqueued {job_id} ({name}) — runs when a pool slot frees")
+    print_success(f"✓ enqueued {job_id} ({name}) — runs when a pool slot frees")
 
 
 @queue_cmd.command("cancel")
@@ -86,7 +87,10 @@ def queue_cancel(job_id: str) -> None:
     paths = EaccodePaths()
     queue = JobQueue(paths.data_dir / "queue.db")
     ok = asyncio.run(queue.cancel(job_id))
-    click.echo("✓ cancelled" if ok else "✗ job not found or already running")
+    if ok:
+        print_success("✓ cancelled")
+    else:
+        print_error("✗ job not found or already running")
 
 
 @queue_cmd.command("prune")
@@ -107,7 +111,7 @@ def queue_prune() -> None:
             with sqlite3.connect(queue.db_path) as conn:
                 conn.execute("DELETE FROM jobs WHERE id=?", (j.id,))
             removed += 1
-    click.echo(f"✓ pruned {removed} finished jobs")
+    print_success(f"✓ pruned {removed} finished jobs")
 
 
 # ------------------------------------------------------------------ review
@@ -133,7 +137,7 @@ def review_cmd(diff_ref: str, aspects: str | None, detach: bool) -> None:
     # never hangs on a credential dialog (Phase A.4).
     diff = bounded_git_probe(["git", "diff", diff_ref], timeout=30)
     if not diff.strip():
-        click.echo("No diff to review.")
+        print_info("No diff to review.")
         return
 
     default_aspects = ["bugs", "security", "tests"]
@@ -162,10 +166,10 @@ def review_cmd(diff_ref: str, aspects: str | None, detach: bool) -> None:
             max_turns=15,
         ))
         enqueued.append(job_id)
-        click.echo(f"✓ enqueued {job_id[:8]} review-{aspect}")
+        print_success(f"✓ enqueued {job_id[:8]} review-{aspect}")
 
     if detach:
-        click.echo(
+        print_info(
             f"Jobs will run in the background pool (max {settings.max_parallel_agents} "
             f"concurrent). Watch with `eaccode queue status`."
         )
@@ -191,7 +195,7 @@ def review_cmd(diff_ref: str, aspects: str | None, detach: bool) -> None:
             await asyncio.sleep(2)
 
     asyncio.run(_wait())
-    click.echo("\nDone. Full reports: `eaccode queue show <job-id>`")
+    print_info("\nDone. Full reports: `eaccode queue show <job-id>`")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from __future__ import annotations
 import click
 
 from eaccode.cli import main
+from eaccode.cli._output import print_error, print_info, print_success
 from eaccode.config.paths import EaccodePaths
 
 # ---------------------------------------------------------------------- mcp
@@ -21,13 +22,13 @@ def mcp_list() -> None:
     paths = EaccodePaths()
     configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
     if not configs:
-        click.echo(
+        print_info(
             "No MCP servers configured. Add one with: "
             "eaccode mcp add <name> -- <command> [args...]"
         )
         return
     for c in configs:
-        click.echo(f"  {c.name:20s} {c.command} {' '.join(c.args)}")
+        print_info(f"  {c.name:20s} {c.command} {' '.join(c.args)}")
 
 
 @mcp.command("add")
@@ -53,7 +54,7 @@ def mcp_add(name: str, command_args: tuple[str, ...]) -> None:
     configs = [c for c in configs if c.name != name]
     configs.append(MCPServerConfig(name=name, command=command, args=args))
     save_mcp_configs(paths.config_dir / "mcp.yaml", configs)
-    click.echo(f"✓ MCP server '{name}' added ({command} {' '.join(args)})")
+    print_success(f"✓ MCP server '{name}' added ({command} {' '.join(args)})")
 
 
 @mcp.command("remove")
@@ -66,9 +67,9 @@ def mcp_remove(name: str) -> None:
     configs = load_mcp_configs(paths.config_dir / "mcp.yaml")
     remaining = [c for c in configs if c.name != name]
     if len(remaining) == len(configs):
-        click.echo(f"✗ MCP server '{name}' not found.")
+        print_error(f"✗ MCP server '{name}' not found.")
         raise SystemExit(1)
     save_mcp_configs(paths.config_dir / "mcp.yaml", remaining)
-    click.echo(f"✓ MCP server '{name}' removed")
+    print_success(f"✓ MCP server '{name}' removed")
 
 
