@@ -829,7 +829,7 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 | TUI-A.3 render_message + Permission-Prompt | ✅ `e9d3d69` |
 | TUI-A.4 Status-Bar | ✅ `e9d3d69` |
 | TUI-A.5 Tests grün + Ruff sauber | ✅ `e9d3d69` |
-| TUI-B Inline-Permission | ⬜ ausstehend |
-| TUI-C Slash-Overlay | ⬜ ausstehend |
-| TUI-D Wire-up + v0.4.0-Tag | ⬜ ausstehend |
+| TUI-B Inline-Permission | ✅ `1262746` (y/a/n/p/Esc direkt im Stream, kein Modal) |
+| TUI-C Slash-Overlay | ✅ `e086c05` (gefilterte Liste, sortiert) |
+| TUI-D Wire-up + v0.4.0-Tag | ✅ `0dcc812` + Tag `v0.4.0` auf origin (839 Tests grün) |
 
