@@ -34,6 +34,14 @@ def extract_text(content: Any) -> str:
     return str(content)
 
 
+def summarize_reasoning(text: str, max_chars: int = 160) -> str:
+    """F.20: single-line reasoning summary for collapsed display."""
+    one_line = " ".join(text.split())
+    if len(one_line) <= max_chars:
+        return one_line
+    return one_line[:max_chars].rstrip() + "…"
+
+
 def merge_usage(a: Any, b: Any) -> Any:
     """Add b's token/cost counters onto a (in place); returns a."""
     if a is None:

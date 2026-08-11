@@ -45,6 +45,9 @@ class ProviderConfig(BaseModel):
     model: str
     base_url: str | None = None
     extra: dict[str, str] = Field(default_factory=dict)
+    # F.22: reasoning toggle — "on" | "off" | "auto". Passed through to
+    # OpenAI-compatible backends (e.g. LM Studio) as extra_body.
+    reasoning: str = "auto"
 
     def to_env(self) -> dict[str, str]:
         """Provider config → environment variables for LiteLLM."""

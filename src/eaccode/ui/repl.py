@@ -440,6 +440,14 @@ class EaccodeApp(App):
             f"{self._total_usage.input_tokens + self._total_usage.output_tokens} tok · "
             f"${self._total_usage.cost_usd:.4f}{ctx_txt}"
         )
+        # F.20: collapsed reasoning summary + F.21: context guidance.
+        if self._reasoning_text and not self._show_reasoning:
+            from eaccode.agent.runtime_helpers import summarize_reasoning
+
+            log.write(f"[dim italic]🧠 {summarize_reasoning(self._reasoning_text)}[/dim italic]")
+        self._reasoning_text = ""
+        if ctx_pct is not None and ctx_pct >= 60:
+            log.write(f"[yellow]context at {ctx_pct}% — /compress frees tokens[/yellow]")
 
     def _context_pct(self) -> int | None:
         """Context-window usage % for the status bar (Phase B.5)."""

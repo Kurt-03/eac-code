@@ -157,9 +157,14 @@ class AgentLoop:
                 if tc.name.startswith("memory_"):
                     self._memory_used_since_nudge = True
                 result = await self._execute_guarded(tc, ctx)
+                # F.19: sanitize credential-like strings before the model
+                # sees the tool result (mirrors the session-save redaction).
+                from eaccode.security.redact import redact_secrets
+
+                content = redact_secrets(result.content)
                 messages.append(
                     Message.tool_result(
-                        tc.id, result.content, is_error=result.is_error, name=tc.name
+                        tc.id, content, is_error=result.is_error, name=tc.name
                     )
                 )
                 if self.config.on_tool_result:
@@ -327,9 +332,13 @@ class AgentLoop:
                 if on_tool_call:
                     on_tool_call(tc)
                 result = await self._execute_guarded(tc, ctx)
+                # F.19: sanitize credential-like strings for the model.
+                from eaccode.security.redact import redact_secrets
+
+                content = redact_secrets(result.content)
                 messages.append(
                     Message.tool_result(
-                        tc.id, result.content, is_error=result.is_error, name=tc.name
+                        tc.id, content, is_error=result.is_error, name=tc.name
                     )
                 )
                 if on_tool_result:

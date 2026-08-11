@@ -451,6 +451,30 @@ def _cmd_compress(app, arg: str) -> CommandResult:
     return CommandResult(message=feedback)
 
 
+def _cmd_context(app, arg: str) -> CommandResult:
+    """F.18: /context — token breakdown per message role."""
+    from eaccode.llm.tokens import count_message_tokens
+
+    if not hasattr(app, "messages") or not app.messages:
+        return CommandResult(message="No messages yet.")
+    model = app._model_name or "default"
+    roles = {"user": 0, "assistant": 0, "tool": 0, "system": 0}
+    for m in app.messages:
+        role = m.get("role", "?")
+        try:
+            tokens = count_message_tokens([m], model)
+        except Exception:
+            tokens = 0
+        roles[role] = roles.get(role, 0) + tokens
+    total = sum(roles.values())
+    lines = [f"Context breakdown ({model}):"]
+    for role in ("user", "assistant", "tool", "system"):
+        pct = f"{roles[role] * 100 // total}%" if total else "0%"
+        lines.append(f"  {role:9s} {roles[role]:6d} tokens ({pct})")
+    lines.append(f"  {'total':9s} {total:6d} tokens")
+    return CommandResult(message="\n".join(lines))
+
+
 def _cmd_diff(app, arg: str) -> CommandResult:
     """/diff [staged|all|session] — git diff for the session (G.2)."""
     from eaccode.ui.diff_cmd import run_diff
@@ -489,6 +513,7 @@ DISPATCH_TABLE: dict[str, object] = {
     "status": _cmd_status,
     "skills": _cmd_skills,
     "compress": _cmd_compress,
+    "context": _cmd_context,
     "diff": _cmd_diff,
 }
 

@@ -109,6 +109,12 @@ class _ResolveMixin:
             kwargs["api_key"] = provider.api_key.get_secret_value()
             if provider.base_url:
                 kwargs["api_base"] = provider.base_url
+        # F.22: LM-Studio-style reasoning toggle via extra_body (only when
+        # the provider explicitly configures it).
+        if provider is not None and getattr(provider, "reasoning", "auto") != "auto":
+            kwargs.setdefault("extra_body", {})["reasoning"] = (
+                getattr(provider, "reasoning", "auto") == "on"
+            )
         return kwargs
 
     @staticmethod

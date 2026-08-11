@@ -90,6 +90,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("plugins", "List context-engine plugins (E.8)", "Tools & Skills"),
     CommandDef("compress", "Manually compact context", "Tools & Skills",
                args_hint="[here N]"),
+    CommandDef("context", "Token breakdown per role (F.18)", "Tools & Skills"),
     CommandDef("diff", "Show git diff (staged|all|session)", "Tools & Skills",
                args_hint="[staged|all|session]",
                subcommands=("staged", "all", "session")),
