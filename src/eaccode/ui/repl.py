@@ -10,6 +10,7 @@ assistant answer on the Windows clipboard (clip.exe), or `/copy all`.
 """
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import ClassVar
 
@@ -158,6 +159,14 @@ class EaccodeApp(App):
             log.write(write_warn(str(e)))
             return
         self._agent = agent
+        # P0.10: session_start hook (fire-and-forget, advisory).
+        if agent.config.hooks_dir is not None:
+            from eaccode.hooks.runner import run_hooks
+
+            await asyncio.to_thread(
+                run_hooks, "session_start", self.workdir,
+                hooks_dir=agent.config.hooks_dir,
+            )
         # Phase B.1: wire the in-REPL permission modal into the loop.
         agent.config.ask_async = self._ask_permission_async
         # P0.8: the `P` approve level pauses the session; /resume unpauses.
@@ -453,7 +462,29 @@ class EaccodeApp(App):
             )
             self._busy = False
             return
+        # P0.10: session_end hook (fire-and-forget — the app is exiting).
+        self._run_session_end_hook()
         self.exit()
+
+    def _run_session_end_hook(self) -> None:
+        """P0.10: run session_end.sh off the event loop (daemon thread)."""
+        agent = getattr(self, "_agent", None)
+        if agent is None or agent.config.hooks_dir is None:
+            return
+        import threading
+
+        from eaccode.hooks.runner import run_hooks
+
+        hooks_dir = agent.config.hooks_dir
+        workdir = agent.config.workdir
+
+        def _fire() -> None:
+            try:
+                run_hooks("session_end", workdir, hooks_dir=hooks_dir)
+            except Exception:
+                pass  # advisory — never break the exit
+
+        threading.Thread(target=_fire, daemon=True).start()
 
     def _switch_model(self, name: str) -> str:
         """/model: rebuild the agent with another provider/model (Phase B.4)."""

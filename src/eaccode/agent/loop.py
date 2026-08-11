@@ -5,6 +5,7 @@ execute → results back to LLM → repeat until final answer or max_turns.
 """
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +53,8 @@ class AgentConfig:
     # P0.5: writer identity for file-state coordination (subagents set
     # "sub:<id>" so their writes can be attributed and reported).
     writer_id: str = "main"
+    # P0.10: hooks directory (None → hooks disabled for this agent).
+    hooks_dir: Path | None = None
 
 
 @dataclass
@@ -271,6 +274,18 @@ class AgentLoop:
         ]
         return [*messages[:-1], Message(role=last.role, content=new_content)]
 
+    async def _run_hooks(self, event: str, env_extra: dict[str, str]) -> str:
+        """P0.10: run *event* hooks off the event loop; return spilled stdout."""
+        if self.config.hooks_dir is None:
+            return ""
+        from eaccode.hooks.runner import run_hooks, spill_output
+
+        results = await asyncio.to_thread(
+            run_hooks, event, self.config.workdir,
+            env_extra, self.config.hooks_dir,
+        )
+        return spill_output(results)
+
     async def _execute_guarded(self, tc: ToolCall, ctx: ToolContext):
         """Guardrails → permission → execute (Phase C.3).
 
@@ -279,6 +294,9 @@ class AgentLoop:
         short-circuit with a synthetic error result.
         """
         from eaccode.tools.base import ToolResult
+
+        # P0.10: pre-tool hooks (advisory — failures never block).
+        await self._run_hooks("pre_tool_use", {"tool": tc.name})
 
         # Phase C.3: loop guardrails — before the call.
         guard = self.guardrails.before_call(tc.name, tc.arguments, registry=self.executor.registry)
@@ -290,6 +308,11 @@ class AgentLoop:
             )
 
         result = await self._execute_with_permission(tc, ctx)
+
+        # P0.10: post-tool hooks — stdout spills into the result.
+        hook_out = await self._run_hooks("post_tool_use", {"tool": tc.name})
+        if hook_out:
+            result.content = f"{result.content}\n\n[hook output]\n{hook_out}"
 
         # Phase C.3: loop guardrails — after the call (warn on loops).
         after = self.guardrails.after_call(

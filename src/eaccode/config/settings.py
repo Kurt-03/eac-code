@@ -43,6 +43,7 @@ class Settings(BaseModel):
     max_parallel_agents: int = Field(default=6, ge=1, le=64)  # hard cap for the worker pool
     save_sessions: bool = True
     ignore_rules: bool = False  # --ignore-rules: skip project context + memory
+    hooks_enabled: bool = True  # P0.10: run hooks from config_dir/hooks/
     curator: CuratorSettings = CuratorSettings()
 
     @classmethod

@@ -236,6 +236,8 @@ async def build_agent_async(
             # compact_threshold). The loop compacts when the window fills.
             auto_compact=settings.auto_compact,
             compact_threshold=settings.compact_threshold,
+            # P0.10: hooks (config_dir/hooks; disabled via settings).
+            hooks_dir=paths.hooks_dir if settings.hooks_enabled else None,
         ),
     )
     for tool in registry.list():
