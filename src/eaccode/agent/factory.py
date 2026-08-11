@@ -197,6 +197,10 @@ async def build_agent_async(
             workdir=workdir,
             max_turns=max_turns or settings.max_turns,
             system_prompt=sysctx.system_prompt,
+            # P0.2: auto-compaction settings (settings.yaml auto_compact /
+            # compact_threshold). The loop compacts when the window fills.
+            auto_compact=settings.auto_compact,
+            compact_threshold=settings.compact_threshold,
         ),
     )
     for tool in registry.list():

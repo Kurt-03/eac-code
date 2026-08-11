@@ -46,6 +46,9 @@ class AgentConfig:
     # P0.8: session pause flag — when set and paused, every tool call is
     # rejected with a hint until the user resumes (/resume in the REPL).
     pause_flag: object | None = None
+    # P0.2: auto-compaction — compact the history when the window fills.
+    auto_compact: bool = False
+    compact_threshold: float = 0.7
 
 
 @dataclass
@@ -90,6 +93,9 @@ class AgentLoop:
         self.guardrails.reset_for_turn()
 
         for turn in range(self.config.max_turns):
+            # P0.2: auto-compaction — when the window fills, demote the
+            # middle before the next model call (soft tail, ghost defense).
+            self._maybe_auto_compact(messages)
             req = CompletionRequest(
                 messages=messages,
                 tools=tool_schemas,
@@ -138,6 +144,20 @@ class AgentLoop:
             f"Reached max_turns={self.config.max_turns} without a final answer"
         )
 
+    def _maybe_auto_compact(self, messages: list[Message]) -> None:
+        """P0.2: compact in place when the window crosses the threshold."""
+        if not self.config.auto_compact:
+            return
+        from eaccode.agent.compaction import compact_messages, should_compact
+
+        model = self.client.default_model
+        if should_compact(messages, model, self.config.compact_threshold):
+            messages[:] = compact_messages(
+                messages,
+                model=model,
+                threshold=self.config.compact_threshold,
+            )
+
     async def run_streaming(
         self,
         messages: list[Message],
@@ -165,6 +185,8 @@ class AgentLoop:
         total_usage = TokenUsage()
 
         for turn in range(self.config.max_turns):
+            # P0.2: auto-compaction (streaming variant).
+            self._maybe_auto_compact(messages)
             req = CompletionRequest(
                 messages=messages,
                 tools=tool_schemas,
