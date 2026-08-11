@@ -63,3 +63,29 @@ async def test_modal_resolution_marks_done():
     await asyncio.sleep(0)  # let the done-callback run
     assert len(registry) == 0
     assert registry.resolve(1, PermissionChoice.ALLOW_ONCE) is False
+
+
+@pytest.mark.asyncio
+async def test_on_approve_callback_runs_on_allow():
+    registry = ApprovalRegistry()
+    future = asyncio.get_running_loop().create_future()
+    applied: list[str] = []
+    registry.register(
+        "memory_remember", {"fact": "x"}, "save x?",
+        future, on_approve=lambda: applied.append("x"),
+    )
+    assert registry.resolve(1, PermissionChoice.ALLOW_ONCE) is True
+    assert applied == ["x"]
+
+
+@pytest.mark.asyncio
+async def test_on_approve_not_called_on_deny():
+    registry = ApprovalRegistry()
+    future = asyncio.get_running_loop().create_future()
+    applied: list[str] = []
+    registry.register(
+        "memory_remember", {"fact": "x"}, "save x?",
+        future, on_approve=lambda: applied.append("x"),
+    )
+    assert registry.resolve(1, PermissionChoice.DENY) is True
+    assert applied == []

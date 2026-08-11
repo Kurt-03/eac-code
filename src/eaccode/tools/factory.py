@@ -134,8 +134,14 @@ def build_default_registry(
         tools = [t for t in tools if t.name in keep]
 
     if allowed_tools is not None:
-        allowed = set(allowed_tools)
-        tools = [t for t in tools if t.name in allowed]
+        # C.2: wildcard whitelists are allowed (e.g. "memory_*" for the
+        # background-review agent).
+        from fnmatch import fnmatch
+
+        tools = [
+            t for t in tools
+            if any(fnmatch(t.name, pat) for pat in allowed_tools)
+        ]
 
     for tool in tools:
         reg.register(tool)

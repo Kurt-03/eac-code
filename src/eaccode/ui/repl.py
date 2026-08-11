@@ -99,6 +99,13 @@ class EaccodeApp(App):
         from eaccode.permissions.approvals import ApprovalRegistry
 
         self._approvals = ApprovalRegistry()
+        # C.1: background-review scheduler (settings.review_every_turns).
+        from eaccode.agent.review_scheduler import ReviewScheduler
+        from eaccode.config.paths import EaccodePaths
+        from eaccode.config.settings import Settings
+
+        _settings = Settings.load(EaccodePaths().settings_file)
+        self._review_scheduler = ReviewScheduler(_settings.review_every_turns)
         self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
 
@@ -402,6 +409,9 @@ class EaccodeApp(App):
         self._last_answer = result.final_text
         log.write(f"[cyan]eaccode[/cyan]\n{result.final_text}")
         self.messages.append({"role": "assistant", "content": result.final_text})
+        # C.1: background review when the turn window is reached.
+        if self._review_scheduler.should_review(result.turns):
+            self.run_worker(self._run_review_worker(log), exclusive=False)
         # Status bar (Phase B.2): model · mode · tokens · cost · ctx%
         self._total_usage += result.usage
         ctx_pct = self._context_pct()
@@ -425,6 +435,61 @@ class EaccodeApp(App):
         except Exception:
             return None
         return min(100, max(1, round(used * 100 / window)))
+
+    async def _run_review_worker(self, log: RichLog) -> None:
+        """C.2/C.3: run the whitelisted review; proposals enter the
+        approval registry — applying them requires /approve."""
+        import asyncio
+
+        from eaccode.agent.background_review import run_review
+        from eaccode.agent.factory import build_agent_async
+        from eaccode.memory.markdown_store import MarkdownMemoryStore
+        from eaccode.memory.store import MemoryStore
+
+        agent = getattr(self, "_agent", None)
+        if agent is None:
+            return
+        # Compact session summary: last few user/assistant texts.
+        summary_lines = [
+            m["content"][:400] for m in self.messages[-6:]
+            if m.get("content")
+        ]
+        if not summary_lines:
+            return
+        log.write("[dim]background review running…[/dim]")
+        result = await run_review(
+            build_agent_async, self.workdir, "\n".join(summary_lines)
+        )
+        if result.empty:
+            log.write("[dim]review: nothing to propose.[/dim]")
+            return
+        store = MarkdownMemoryStore(self._md_memory_dir())
+        hash_ = MemoryStore.project_hash(self.workdir)
+        ids: list[int] = []
+        for fact in result.facts:
+            future: asyncio.Future = asyncio.get_running_loop().create_future()
+            approval_id = self._approvals.register(
+                "memory_remember",
+                {"fact": fact},
+                f"review: save fact {fact[:50]!r}",
+                future,
+                on_approve=lambda f=fact: store.add_fact("memory", f, hash_),
+            )
+            ids.append(approval_id)
+        log.write(
+            f"[dim]review: {len(result.facts)} fact(s) proposed — "
+            f"/approve {' '.join(f'#{i}' for i in ids)} to save "
+            "(/deny to discard).[/dim]"
+        )
+        if result.skills:
+            log.write("[dim]review: skill suggestions (not applied): "
+                      + "; ".join(result.skills) + "[/dim]")
+
+    def _md_memory_dir(self):
+        """Memory dir used by the review worker (matches commands.py)."""
+        from eaccode.config.paths import EaccodePaths
+
+        return EaccodePaths().memory_dir
 
     def _spinner_frame(self) -> str:
         """Next Braille spinner frame (Phase B.4)."""

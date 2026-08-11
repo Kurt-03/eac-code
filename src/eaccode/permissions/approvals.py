@@ -9,6 +9,7 @@ after the fact. Double resolution is safe (the future is already done).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,15 +27,19 @@ class PendingApproval:
 class ApprovalRegistry:
     def __init__(self) -> None:
         self._pending: dict[int, PendingApproval] = {}
+        self._callbacks: dict[int, Callable[[], None]] = {}
         self._next_id = 1
 
     def register(self, tool: str, arguments: dict, question: str,
-                 future: Any) -> int:
+                 future: Any, on_approve: Callable[[], None] | None = None) -> int:
+        """Register an ask; *on_approve* runs when resolved as ALLOW."""
         approval_id = self._next_id
         self._next_id += 1
         self._pending[approval_id] = PendingApproval(
             approval_id, tool, arguments, question, future
         )
+        if on_approve is not None:
+            self._callbacks[approval_id] = on_approve
         future.add_done_callback(lambda _f: self._mark_done(approval_id))
         return approval_id
 
@@ -53,6 +58,9 @@ class ApprovalRegistry:
         except Exception:
             return False
         entry.done = True
+        callback = self._callbacks.pop(approval_id, None)
+        if callback is not None and getattr(choice, "value", choice) == "allow-once":
+            callback()
         return True
 
     def pending(self) -> list[PendingApproval]:

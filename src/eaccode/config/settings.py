@@ -61,6 +61,10 @@ class Settings(BaseModel):
         default=5, ge=0,
         description="A.9: hint to save memory every N turns (0 = off)",
     )
+    review_every_turns: int = Field(
+        default=5, ge=0,
+        description="C.1: background review every N turns (0 = off)",
+    )
     skills: SkillSettings = SkillSettings()
     curator: CuratorSettings = CuratorSettings()
 
