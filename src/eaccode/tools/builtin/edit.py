@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
+from eaccode.tools.file_state import lock_path, touch
 
 
 class EditInput(BaseModel):
@@ -59,7 +60,11 @@ class EditTool(Tool):
             )
         new_text = text.replace(input.old_string, input.new_string, 1)
         try:
-            path.write_text(new_text, encoding="utf-8")
+            # P0.5: read-modify-write under the per-path lock, and record
+            # the write for subagent conflict detection.
+            with lock_path(path):
+                path.write_text(new_text, encoding="utf-8")
+                touch(path, writer_id=ctx.writer_id)
         except Exception as e:
             return ToolResult(content=f"Error writing file: {e}", is_error=True)
         return ToolResult(content=f"Edited {path}", metadata={"path": str(path)})

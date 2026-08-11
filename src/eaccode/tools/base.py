@@ -38,6 +38,8 @@ class ToolContext(BaseModel):
     skills_dir: Path = Field(default_factory=Path)
     # P0.3: markdown memory dir (None → tools fall back to EaccodePaths).
     memory_dir: Path | None = None
+    # P0.5: writer identity for file-state coordination ("main" or "sub:<id>").
+    writer_id: str = "main"
     config: Any = None
 
 

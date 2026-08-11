@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
+from eaccode.tools.file_state import lock_path, touch
 
 
 class WriteInput(BaseModel):
@@ -33,8 +34,10 @@ class WriteTool(Tool):
 
         save_checkpoint(ctx.workdir, path)  # Phase C.4 snapshot
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(input.content, encoding="utf-8")
+            with lock_path(path):  # P0.5: per-path write coordination
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(input.content, encoding="utf-8")
+                touch(path, writer_id=ctx.writer_id)  # P0.5: record the write
         except Exception as e:
             return ToolResult(content=f"Error writing file: {e}", is_error=True)
         return ToolResult(

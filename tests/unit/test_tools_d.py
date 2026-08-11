@@ -49,7 +49,12 @@ async def test_delegate_requires_builder(tmp_path):
 
 @pytest.mark.asyncio
 async def test_delegate_runs_subagent(tmp_path):
+    class FakeConfig:
+        writer_id = "main"
+
     class FakeSubAgent:
+        config = FakeConfig()
+
         async def run(self, messages):
             from eaccode.agent.loop import AgentResult
             from eaccode.llm.client import TokenUsage

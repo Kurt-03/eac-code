@@ -49,6 +49,9 @@ class AgentConfig:
     # P0.2: auto-compaction — compact the history when the window fills.
     auto_compact: bool = False
     compact_threshold: float = 0.7
+    # P0.5: writer identity for file-state coordination (subagents set
+    # "sub:<id>" so their writes can be attributed and reported).
+    writer_id: str = "main"
 
 
 @dataclass
@@ -87,6 +90,7 @@ class AgentLoop:
             workdir=self.config.workdir,
             permission_mode=self.policy.mode.value,
             skills_dir=self.config.skills_dir or Path(),
+            writer_id=self.config.writer_id,
         )
         total_usage = TokenUsage()
 
@@ -150,7 +154,7 @@ class AgentLoop:
             return
         from eaccode.agent.compaction import compact_messages, should_compact
 
-        model = self.client.default_model
+        model = getattr(self.client, "default_model", "anthropic/claude-sonnet-4-6")
         if should_compact(messages, model, self.config.compact_threshold):
             messages[:] = compact_messages(
                 messages,
@@ -181,6 +185,7 @@ class AgentLoop:
             workdir=self.config.workdir,
             permission_mode=self.policy.mode.value,
             skills_dir=self.config.skills_dir or Path(),
+            writer_id=self.config.writer_id,
         )
         total_usage = TokenUsage()
 

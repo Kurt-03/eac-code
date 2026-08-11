@@ -13,6 +13,8 @@ broken goal doesn't drop the others).
 from __future__ import annotations
 
 import asyncio
+import time
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -68,11 +70,26 @@ class DelegateTool(Tool):
         async with _semaphore:
             try:
                 agent, _, _ = await builder(ctx.workdir, max_turns=max_turns)
+                # P0.5: attribute this subagent's writes so the caller can
+                # detect conflicts with its own edits.
+                sub_id = f"sub:{uuid4().hex[:8]}"
+                agent.config.writer_id = sub_id
+                from eaccode.tools.file_state import writes_by
+
+                start_ts = time.monotonic()
                 from eaccode.llm.models import Message
 
                 prompt = f"{context}\n\n{goal}" if context else goal
                 result = await agent.run([Message.user(prompt)])
-                return ToolResult(content=result.final_text)
+                wrote = writes_by(start_ts, {sub_id})
+                content = result.final_text
+                if wrote:
+                    paths = ", ".join(p for p, _ in wrote)
+                    content += (
+                        f"\n\n[file-state] Subagent wrote: {paths} — "
+                        "check for conflicts with your own edits."
+                    )
+                return ToolResult(content=content)
             except Exception as e:
                 return ToolResult(
                     content=f"Subagent failed: {type(e).__name__}: {e}",
