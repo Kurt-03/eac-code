@@ -655,11 +655,11 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| B.1 Aux-LLM-Client | ✅ | `(B-Commit)` |
-| B.2 safeAuto-Klassifikation | ✅ | `(B-Commit)` |
-| B.3 /mode safeAuto (Migration) | ✅ | `(B-Commit)` |
-| B.4 /approve + /deny | ✅ | `(B-Commit)` |
-| B.5 Policy-Scopes | ✅ | `(B-Commit)` |
+| B.1 Aux-LLM-Client | ✅ | `7e820d8` |
+| B.2 safeAuto-Klassifikation | ✅ | `7e820d8` |
+| B.3 /mode safeAuto (Migration) | ✅ | `7e820d8` |
+| B.4 /approve + /deny | ✅ | `7e820d8` |
+| B.5 Policy-Scopes | ✅ | `7e820d8` |
 
 ### Phase C — Background-Review + Curator
 
