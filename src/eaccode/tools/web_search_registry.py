@@ -12,6 +12,8 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import httpx
+
 SearchProvider = Callable[["str", int], "list[SearchResult]"]
 
 
@@ -54,8 +56,6 @@ def search(query: str, limit: int = 5, provider: str = "ddg") -> list[SearchResu
 def _ddg_provider(query: str, limit: int) -> list[SearchResult]:
     import html as html_mod
 
-    import httpx
-
     resp = httpx.get(
         "https://html.duckduckgo.com/html/",
         params={"q": query},
@@ -63,7 +63,8 @@ def _ddg_provider(query: str, limit: int) -> list[SearchResult]:
         follow_redirects=True,
         headers={"User-Agent": "eaccode/0.1 (+https://github.com/Kurt-03/eac-code)"},
     )
-    resp.raise_for_status()
+    if resp.status_code >= 400:
+        raise RuntimeError(f"search failed: HTTP {resp.status_code}")
     results: list[SearchResult] = []
     # Parse the classic <a class="result__a"> + <a class="result__snippet"> rows.
     for block in re.findall(
