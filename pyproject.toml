@@ -63,6 +63,14 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# TUI markers: › ▸ ⠋ ─ ✗ ‖ — they're intentional, not ambiguous.
+"src/eaccode/tui/*.py" = ["RUF001", "RUF002"]
+# The repl hosts the same flat-TUI markers.
+"src/eaccode/ui/repl.py" = ["RUF001", "RUF002", "SIM105"]
+# String-golden tests assert exact TUI markers.
+"tests/unit/test_tui_*.py" = ["RUF001", "RUF002"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

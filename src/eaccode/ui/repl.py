@@ -14,11 +14,10 @@ import asyncio
 from pathlib import Path
 from typing import ClassVar
 
-from rich.panel import Panel
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.widgets import Input, RichLog, Static
 
 from eaccode.llm.client import TokenUsage
 from eaccode.llm.models import ToolCall
@@ -31,8 +30,12 @@ from eaccode.ui.suggester import SlashCommandSuggester
 
 class EaccodeApp(App):
     TITLE = "eaccode"
-    SUB_TITLE = "autonomous coding agent"
+    SUB_TITLE = ""
 
+    # v0.4.0 (Phase A): no Header, no Footer, no border boxes, no
+    # surface background. The Log sits on the terminal's default,
+    # the Input has a thin separator above it, the Status bar lives
+    # below the Input as a plain Static.
     CSS = """
     Screen {
         background: $background;
@@ -40,25 +43,21 @@ class EaccodeApp(App):
     #log {
         height: 1fr;
         border: none;
-        padding: 1 2;
-        background: $surface;
-    }
-    #stream {
-        height: auto;
-        max-height: 10;
-        color: $text-muted;
-        padding: 0 2 0 2;
-        display: none;
+        padding: 0 1;
+        background: $background;
     }
     #input {
-        height: 3;
-        border: round $accent;
-        border-title-color: $accent;
+        height: 1;
+        border: none;
         padding: 0 1;
-        background: $surface;
+        background: $background;
     }
-    #input:focus {
-        border: round $primary;
+    #status {
+        height: 1;
+        dock: bottom;
+        padding: 0 1;
+        color: $text-muted;
+        background: $background;
     }
     """
 
@@ -131,16 +130,17 @@ class EaccodeApp(App):
         install_plugin_commands(get_engine(EaccodePaths().plugins_dir).slash_specs())
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        # v0.4.0 (Phase A): drop Header / Footer. Flat log + input + status.
+        # Log keeps Rich markup ([dim], [green], …) for subtle styling —
+        # only the surrounding Boxen are gone.
         with Vertical():
             yield RichLog(id="log", wrap=True, markup=True, highlight=False)
-            yield Static(id="stream")
             yield Input(
-                placeholder="Ask eaccode anything…  (/help for commands)",
+                placeholder="›  ask eaccode…  (/ for commands)",
                 id="input",
-                suggester=self._suggester,  # Phase F.2: slash/@/path completion
+                suggester=self._suggester,
             )
-        yield Footer()
+            yield Static(id="status")
 
     def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
@@ -230,8 +230,7 @@ class EaccodeApp(App):
         if not text:
             return
         event.input.value = ""
-        log.write(Panel.fit(f"[bold blue]❯[/bold blue] {text}",  # noqa: RUF001
-                            border_style="blue", title="you"))
+        log.write(f"› {text}\n")  # v0.4.0: flat user marker, no Panel
 
         if text.startswith("/"):
             result = handle_command(text, self)
@@ -264,7 +263,8 @@ class EaccodeApp(App):
         finally:
             self._busy = False
             self._current_task = None
-            self.query_one("#stream", Static).update("")
+            # v0.4.0: spinner is now part of the Log — hide via the
+            # `_hide_spinner` path called from on_text / on_tool_result.
 
     def _ask_permission_async(self, tool_name: str, arguments: dict, question: str) -> object:
         """Push the permission modal; return a Future the loop awaits (B.1)."""
@@ -324,21 +324,23 @@ class EaccodeApp(App):
             else:
                 history.append(Message.assistant(m["content"]))
 
-        stream_box = self.query_one("#stream", Static)
-        stream_box.styles.display = "block"
+        log = self.query_one("#log", RichLog)
         self._stream_text = ""
         self._reasoning_text = ""
         self._tool_starts: dict[str, float] = {}
+        # v0.4.0 (Phase A): spinner writes a single line into the Log that
+        # gets replaced on every tick (no separate #stream Static).
+        self._spinner_line_idx = log.write("  ⠋")
         # C.4: single-writer fence — a new turn supersedes this stream.
         # claim_stream_writer stores the token on self (P0.6 Bug 1 fix).
         from eaccode.llm.stream_fence import claim_stream_writer, fence_delta
 
         claim_stream_writer(self)
         writer_token = self._stream_writer_token
-        # B.4: animated spinner while the agent works (Braille cycle).
+        # B.4: animated spinner while the agent works (v0.4.0: ASCII cycle,
+        # line already written into the Log by _run_agent_streaming above).
         self._spinner_idx = 0
         self._spinner_interval = self.set_interval(0.125, self._tick_spinner)
-        stream_box.update(self._spinner_frame())
         from eaccode.ui.preview import (
             CHEVRON,
             VerboseLevel,
@@ -350,13 +352,19 @@ class EaccodeApp(App):
             if self._spinner_interval is not None:
                 self._spinner_interval.stop()
                 self._spinner_interval = None
+            if self._spinner_line_idx is not None:
+                try:
+                    log.lines.pop(self._spinner_line_idx)
+                except Exception:
+                    pass
+                self._spinner_line_idx = None
 
         def on_text(delta: str) -> None:
             if fence_delta(self, writer_token, delta) is None:
                 return  # stale stream — a newer turn owns the UI
             _hide_spinner()
             self._stream_text += delta
-            stream_box.update(f"[dim]{self._stream_text}[/dim]")
+            self.query_one("#log", RichLog).write(f"    {self._stream_text}")
 
         def on_reasoning_delta(delta: str) -> None:
             """Accumulate reasoning; render collapsed above the answer (B.3).
@@ -372,13 +380,13 @@ class EaccodeApp(App):
                 return  # collapsed: don't paint, just accumulate
             capped = self._reasoning_text[:2000]
             suffix = "…" if len(self._reasoning_text) > 2000 else ""
-            stream_box.update(
-                f"[dim italic]{capped}{suffix}[/dim italic]\n[dim]{self._stream_text}[/dim]"
+            self.query_one("#log", RichLog).write(
+                f"[dim italic]{capped}{suffix}[/dim italic]\n"
+                f"[dim]{self._stream_text}[/dim]"
             )
 
         def on_tool_call(tc: ToolCall) -> None:
             _hide_spinner()
-            stream_box.update("")
             self._stream_text = ""
             import time
 
@@ -433,7 +441,7 @@ class EaccodeApp(App):
             on_tool_call=on_tool_call,
             on_tool_result=on_tool_result,
         )
-        stream_box.styles.display = "none"
+        # v0.4.0: spinner is part of the Log now; nothing to hide here.
         self._last_answer = result.final_text
         log.write(f"[cyan]eaccode[/cyan]\n{result.final_text}")
         self.messages.append({"role": "assistant", "content": result.final_text})
@@ -459,12 +467,15 @@ class EaccodeApp(App):
         per_model.output_tokens += result.usage.output_tokens
         per_model.cost_usd += result.usage.cost_usd
         ctx_pct = self._context_pct()
-        ctx_txt = f" · {ctx_pct}%" if ctx_pct is not None else ""
-        self.sub_title = (
-            f"{self._model_name or '?'} · {self._mode_name or self._agent.policy.mode.value} · "
-            f"{self._total_usage.input_tokens + self._total_usage.output_tokens} tok · "
-            f"${self._total_usage.cost_usd:.4f}{ctx_txt}"
-        )
+        # v0.4.0 (Phase A.4): write the new status bar — drop sub_title.
+        from eaccode.tui.status_bar import StatusBar
+
+        self.query_one("#status", Static).update(StatusBar(
+            model=self._model_name or "?",
+            mode=self._mode_name or self._agent.policy.mode.value,
+            context_pct=ctx_pct,
+            cost_usd=self._total_usage.cost_usd,
+        ).render())
         # F.20: collapsed reasoning summary + F.21: context guidance.
         if self._reasoning_text and not self._show_reasoning:
             from eaccode.agent.runtime_helpers import summarize_reasoning
@@ -614,18 +625,32 @@ class EaccodeApp(App):
         return EaccodePaths().memory_dir
 
     def _spinner_frame(self) -> str:
-        """Next Braille spinner frame (Phase B.4)."""
-        frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-        frame = frames[self._spinner_idx % len(frames)]
-        self._spinner_idx += 1
-        return f"[dim]{frame} working…[/dim]"
+        """Next ASCII spinner frame (Phase A.2: v0.4.0)."""
+        from eaccode.tui.spinner import Spinner as _Spinner
+
+        # Use a small standalone instance so the spinner's index advances
+        # independently of the legacy _spinner_idx counter.
+        spinner = _Spinner(interval=0.125)
+        spinner.tick()
+        return spinner.frame()
 
     def _tick_spinner(self) -> None:
-        """Textual interval callback: repaint the spinner frame."""
-        if self._busy:
-            stream = self.query_one("#stream", Static)
-            if stream.styles.display != "none":
-                stream.update(self._spinner_frame())
+        """v0.4.0 (Phase A.2): replace the spinner line in the Log."""
+        from eaccode.tui.spinner import Spinner as _Spinner
+
+        if not self._busy or self._spinner_line_idx is None:
+            return
+        self._spinner = getattr(self, "_spinner", _Spinner(interval=0.125))
+        self._spinner.tick()
+        try:
+            log = self.query_one("#log", RichLog)
+            if self._spinner_line_idx < len(log.lines):
+                log.lines[self._spinner_line_idx]._renderable = (
+                    f"  {self._spinner.frame()}"
+                )
+                log.refresh()
+        except Exception:
+            pass
 
     def action_open_palette(self) -> None:
         """Ctrl+K: open the filterable command palette (Phase F.3)."""
@@ -717,12 +742,13 @@ class EaccodeApp(App):
             self._agent = agent
             self._model_name = name
             self.query_one("#log", RichLog).write(
-                f"[green]✓ model switched to {name}[/green]"
+                f"✓ model switched to {name}"
             )
-            self.sub_title = f"{name} · {self._mode_name or agent.policy.mode.value}"
+            # v0.4.0: refresh the status bar widget instead of sub_title.
+            self._refresh_status_bar()
         except Exception as e:
             self.query_one("#log", RichLog).write(
-                f"[red]✗ model switch failed: {e}[/red]"
+                f"✗ model switch failed: {e}"
             )
 
     def _retry_last(self) -> str:
