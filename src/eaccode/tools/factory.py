@@ -17,7 +17,8 @@ TOOLSETS: dict[str, set[str]] = {
     "terminal": {"bash", "process"},
     "file": {"read", "write", "edit", "glob", "grep", "search_files"},
     "code_execution": {"execute_code"},
-    "skills": {"skill_create", "skill_patch", "skill_list"},
+    "skills": {"skill_create", "skill_patch", "skill_list", "skill_delete",
+               "skill_write_file", "skill_remove_file"},
     "todo": {"todo_write"},
     "memory": {"memory_remember", "memory_recall", "memory_forget",
                "memory_edit"},
@@ -47,7 +48,14 @@ def _all_tools() -> list[Tool]:
         MemoryRecallTool,
         MemoryRememberTool,
     )
-    from eaccode.memory.skill_tools import SkillCreateTool, SkillListTool, SkillPatchTool
+    from eaccode.memory.skill_tools import (
+        SkillCreateTool,
+        SkillDeleteTool,
+        SkillListTool,
+        SkillPatchTool,
+        SkillRemoveFileTool,
+        SkillWriteFileTool,
+    )
     from eaccode.tools.builtin.bash import BashTool
     from eaccode.tools.builtin.browser import BrowserTool
     from eaccode.tools.builtin.clarify import ClarifyTool
@@ -78,6 +86,9 @@ def _all_tools() -> list[Tool]:
         SkillCreateTool(),
         SkillPatchTool(),
         SkillListTool(),
+        SkillDeleteTool(),
+        SkillWriteFileTool(),
+        SkillRemoveFileTool(),
         ClarifyTool(),
         ExecuteCodeTool(),
         DelegateTool(),
