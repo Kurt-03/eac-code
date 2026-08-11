@@ -75,7 +75,8 @@ def doctor() -> None:
         has_key = bool(p.api_key)
         has_env = bool(getattr(p, "api_key_env", None))
         check(has_key or has_env,
-              f"provider {p.name}: key set ({'env' if has_env else 'file' if has_key else 'MISSING'})")
+              f"provider {p.name}: key set "
+              f"({'env' if has_env else 'file' if has_key else 'MISSING'})")
 
     if problems:
         print_info(f"\n{problems} issue(s) found.")

@@ -83,10 +83,10 @@ class Settings(BaseModel):
                 raise ValueError("settings root must be a mapping")
         except (OSError, ValueError, yaml.YAMLError) as e:
             broken = path.with_suffix(path.suffix + ".broken")
-            try:
+            from contextlib import suppress
+
+            with suppress(OSError):
                 path.replace(broken)
-            except OSError:
-                pass
             cls._warn_fallback(path, broken, e)
             return cls()
         # B.3/E.4: migrate the renamed permission mode.
