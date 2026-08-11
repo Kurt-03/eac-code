@@ -57,6 +57,27 @@ def record_view(source: Path) -> None:
     _touch(source, "view_count")
 
 
+def record_write(source: Path) -> None:
+    """Count a skill write (create/patch/edit by agent or curator)."""
+    _touch(source, "write_count")
+
+
+def set_pinned(source: Path, pinned: bool = True) -> None:
+    """Mark a skill as pinned (protects it from curator archiving)."""
+    data = read_usage(source)
+    data["pinned"] = bool(pinned)
+    _write_usage(source, data)
+
+
+def is_pinned(source: Path) -> bool:
+    return bool(read_usage(source).get("pinned"))
+
+
+def list_usage(sources: list[Path]) -> dict[str, dict]:
+    """All usage sidecars for the given skill files (path -> usage dict)."""
+    return {str(s): read_usage(s) for s in sources}
+
+
 def last_used_ts(source: Path) -> float | None:
     """Epoch seconds of the last recorded use/view, else None."""
     ts = read_usage(source).get("last_used")

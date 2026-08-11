@@ -626,3 +626,195 @@ CLI-Monolith, Hermes-1:1-Ports (base/constants/runner/…), Tirith, Camofox.
 **Definition of Done für jeden Task:** Tests grün (RED vorher), Ruff sauber, Commit mit
 Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
+---
+
+## 6. Fortschritt (Abarbeitungs-Status)
+
+> **Lebende Checkliste** — wird nach JEDEM fertigen Feature aktualisiert (User-Anforderung).
+> Legende: ⬜ offen · 🔄 in Arbeit · ✅ fertig (Commit) · ⛔ gestrichen
+
+### Phase A — Skill-System
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| A.1 skill_utils (Frontmatter/Platform) | 🔄 | — |
+| A.2 Skill-Manager 5+ Actions | ⬜ | — |
+| A.3 Skill-Provenance + Usage-Backend | 🔄 | — |
+| A.4 Skill-Linter | ⬜ | — |
+| A.5 skill_preprocessing (Template-Vars) | ⬜ | — |
+| A.6 Skill-Triggers + Pre-Filter | ⬜ | — |
+| A.7 skills_config | ⬜ | — |
+| A.8 default_soul | ⬜ | — |
+| A.9 Memory-Auto-Nudge | ⬜ | — |
+| A.10 memory_provider-Base | ⬜ | — |
+| A.11 Lokale Skill-Bundles | ⬜ | — |
+| A.12 mem_trim | ⬜ | — |
+| A.13 Lokale Skills-Sammlung | ⬜ | — |
+
+### Phase B — safeAuto + Approval
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| B.1 Aux-LLM-Client | ⬜ | — |
+| B.2 safeAuto-Klassifikation | ⬜ | — |
+| B.3 /mode safeAuto (Migration) | ⬜ | — |
+| B.4 /approve + /deny | ⬜ | — |
+| B.5 Policy-Scopes | ⬜ | — |
+
+### Phase C — Background-Review + Curator
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| C.1 Review-Scheduler | ⬜ | — |
+| C.2 Review-Agent (Whitelist) | ⬜ | — |
+| C.3 Review-Ergebnis (Approval-Gate) | ⬜ | — |
+| C.4 Async-Delegation | ⬜ | — |
+| C.5 Curator-Lifecycle | ⬜ | — |
+| C.6 Curator-Backup | ⬜ | — |
+| C.7 Learning-Graph | ⬜ | — |
+| C.8 learn_prompt | ⬜ | — |
+
+### Phase D — Sessions & Titel
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| D.1 Title-Generator two-stage | ⬜ | — |
+| D.2 Titel-Persistenz | ⬜ | — |
+| D.3 Session-Export MD/HTML | ⬜ | — |
+| D.4 Listing + Filter | ⬜ | — |
+| D.5 Session-Recap | ⬜ | — |
+| D.6 Session-Metadaten | ⬜ | — |
+| D.7 Session-Recovery | ⬜ | — |
+| D.8 Active-Session-Lease | ⬜ | — |
+| D.9 SQLite-Entscheid | ⬜ | — |
+
+### Phase E — CLI-Subcommands
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| E.1 Subcommands anlegen | ⬜ | — |
+| E.2 First-Run-Setup | ⬜ | — |
+| E.3 Settings-Sektionen | ⬜ | — |
+| E.4 Config-Migration | ⬜ | — |
+| E.5 fallback_config | ⬜ | — |
+| E.6 env_loader | ⬜ | — |
+| E.7 model_setup_flows | ⬜ | — |
+| E.8 /plugins Command | ⬜ | — |
+| E.9 oneshot prüfen | ⬜ | — |
+| E.11 env_probe | ⬜ | — |
+| E.12 /hooks Command | ⬜ | — |
+| E.13 Backup-CLI | ⬜ | — |
+| E.14 Update-Cmd | ⬜ | — |
+| E.15 Doctor erweitern | ⬜ | — |
+| E.16 dump | ⬜ | — |
+| E.17 dep_ensure | ⬜ | — |
+| E.18 /version + build_info | ⬜ | — |
+| E.19 init_command | ⬜ | — |
+| E.20 /status erweitern | ⬜ | — |
+
+### Phase F — Agent-Runtime
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| F.1 Init-Reihenfolge/Profile | ⬜ | — |
+| F.7 Turn-Finalizer | ⬜ | — |
+| F.8 Runtime-Helpers | ⬜ | — |
+| F.9 turn_context | ⬜ | — |
+| F.10 turn_retry_state | ⬜ | — |
+| F.11 turn_summary | ⬜ | — |
+| F.12 iteration_budget | ⬜ | — |
+| F.13 runtime_cwd | ⬜ | — |
+| F.14 async_utils | ⬜ | — |
+| F.15 conversation_compression | ⬜ | — |
+| F.16 manual_compression_feedback | ⬜ | — |
+| F.17 @folder + @git | ⬜ | — |
+| F.18 Context-Grid | ⬜ | — |
+| F.19 message_sanitization | ⬜ | — |
+| F.20 reasoning_summaries | ⬜ | — |
+| F.21 thinking_timeout_guidance | ⬜ | — |
+| F.22 lmstudio_reasoning | ⬜ | — |
+| F.23 verification_evidence | ⬜ | — |
+| F.24 verify_on_stop | ⬜ | — |
+| F.25 redact erweitern | ⬜ | — |
+| F.26 replay_cleanup | ⬜ | — |
+| F.27 estop | ⬜ | — |
+| F.28 interrupt | ⬜ | — |
+| F.29 thread_scoped_silence | ⬜ | — |
+| F.30 AGENTS.md Parent-Chain | ⬜ | — |
+| F.31 prompt_caching | ⬜ | — |
+| F.32 error_classifier | ⬜ | — |
+| F.33 bounded_response | ⬜ | — |
+| F.34 native_compaction | ⬜ | — |
+| F.35 _cache | ⬜ | — |
+| F.36 timeouts | ⬜ | — |
+| F.37 budget_config | ⬜ | — |
+
+### Phase G — Cron/Process/Vision/Web
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| G.1 Terminal-Vollausbau (PTY) | ⬜ | — |
+| G.2 Process-Registry | ⬜ | — |
+| G.3 Daemon-Pool | ⬜ | — |
+| G.4 MCP-Vollausbau | ⬜ | — |
+| G.5 Cron-Full-Surface | ⬜ | — |
+| G.6 web_search_registry | ⬜ | — |
+| G.7 heartbeat | ⬜ | — |
+| G.8 Tool-Executor parallel | ⬜ | — |
+| G.9 MCP-Server (optional) | ⬜ | — |
+
+### Phase H — Tools-Detail & Safety
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| H.1 redact_tool_args_for_display | ⬜ | — |
+| H.2 Argument-Canonicalizer | ⬜ | — |
+| H.3 ToolClass-Audit | ⬜ | — |
+| H.4 file_safety-Klassen | ⬜ | — |
+| H.5 markdown_tables | ⬜ | — |
+| H.6 image_routing | ⬜ | — |
+| H.7 flatten_message_text | ⬜ | — |
+| H.8 sizefmt + timefmt | ⬜ | — |
+| H.9 Clipboard-Bilder | ⬜ | — |
+| H.10 File-Ops-Feinschliff | ⬜ | — |
+| H.11 url_safety | ⬜ | — |
+| H.12 working_diff | ⬜ | — |
+| H.13 patch_parser | ⬜ | — |
+| H.14 ansi_strip | ⬜ | — |
+| H.15 lazy_deps | ⬜ | — |
+| H.16 schema_sanitizer | ⬜ | — |
+| H.17 tool_search | ⬜ | — |
+| H.18 tool_output_limits | ⬜ | — |
+| H.19 tool_result_storage | ⬜ | — |
+| H.20 self_repo_guard | ⬜ | — |
+| H.21 threat_patterns | ⬜ | — |
+| H.22 credential_files | ⬜ | — |
+| H.23 execute_code-Caps | ⬜ | — |
+| H.24 Browser-Feinschliff | ⬜ | — |
+| H.25 computer_use-Schema | ⬜ | — |
+| H.26 image_source | ⬜ | — |
+| H.27 checkpoint_manager | ⬜ | — |
+
+### Phase J — P1-Rest (J.1–J.54, gebündelt)
+
+| Cluster | Status | Notiz |
+|---|---|---|
+| J.1–J.6 (Insights, Debug, Reactions, Onboarding, Plugin-LLM, Pricing) | ⬜ | — |
+| J.7–J.12 (Credential-Pool, Range-Shift, SSL, Portal-Tags, i18n, Jiter) | ⬜ | — |
+| J.13–J.18 (Trajectory, Events/Emitter, Recipes, Monitoring, Store-Abstract, Manifest) | ⬜ | — |
+| J.19–J.24 (State, Protocol, Servers, Runtime-Provider, Model-Catalog, Model-Tools) | ⬜ | — |
+| J.25–J.30 (Provider-Catalog, Agent-Import, Blueprint, Security-Audit, Uninstall, Spinner) | ⬜ | — |
+| J.31–J.36 (Tips, Colors, Banner, Focus-View, Input-Sanitize, Middleware) | ⬜ | — |
+| J.37–J.42 (Lifecycle, Managed-Scope, Relaunch, Completion, Inventory, Thread-Context) | ⬜ | — |
+| J.43–J.48 (Tool-Gateway, Slash-Confirm, Project-Tools, Clarify-Gateway, Preview-Tools, Skills-Sync) | ⬜ | — |
+| J.49–J.54 (State, Constants, Evals, Assets, MCP-Data, Datagen) | ⬜ | — |
+
+### Phase K — Finale Verifikation
+
+| Task | Status | Commit / Notiz |
+|---|---|---|
+| K.1 Gesamt-Suite + Ruff | ⬜ | — |
+| K.2 README + docs/ | ⬜ | — |
+| K.3 CHANGELOG | ⬜ | — |
+| K.4 Push + Tag v0.3.0 | ⬜ | — |
+
