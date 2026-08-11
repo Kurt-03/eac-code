@@ -84,5 +84,3 @@ role-gutter message layout (roles.ts), the status rule (appChrome.tsx),
 and the color role system (theme.ts) were ported and adapted for
 eaccode. The original MIT copyright notice applies to those design
 elements.
-
-MIT
