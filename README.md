@@ -31,10 +31,14 @@ eaccode queue status          # watch the pool from any terminal
 - **BYOK** — provider-agnostic via LiteLLM: native providers (minimax, anthropic,
   openai, ...) and custom OpenAI-compatible endpoints (opencode-go) with
   per-request credentials
-- **4 permission modes** — `default`, `acceptEdits`, `plan`, `bypassPermissions`
-  (switchable in the REPL with `/mode`)
+- **4 permission modes** — `default`, `acceptEdits`, `plan`, `safeAuto`
+  (auto-approves classified-safe bash via key patterns + optional aux LLM),
+  `bypassPermissions` — switchable in the REPL with `/mode`; `/approve <id>`
+  and `/deny <id>` resolve pending asks, persistent allowlist via `/allow`
 - **Built-in tools** — read, write, edit, bash (timeout + exit codes), glob,
-  grep (ripgrep + fallback), web_fetch, todo_write
+  grep (ripgrep + fallback), web_fetch, web_search (keyless), web_extract,
+  todo_write, process, vision, delegate (batch + background), cronjob,
+  tool_search, execute_code, MCP
 - **Provider-specific thinking** — `effort: low|medium|high` mapped per model
   (Anthropic budget_tokens, OpenAI reasoning_effort, Gemini thinkingBudget,
   DeepSeek/Qwen reasoning_content in stream)
@@ -42,12 +46,17 @@ eaccode queue status          # watch the pool from any terminal
   built-ins, automatic provider failover
 - **Project memory** — `EACCODE.md`/`AGENTS.md` auto-discovery (parent walk to
   git root, 20K cap, prompt-injection scanner), auto-learned facts per project
-  (`/remember`, `/forget`), skills that the agent creates and patches itself
+  (`/remember`, `/forget`), markdown memory (MEMORY.md/USER.md/SOUL.md),
+  background reviews that propose facts (approved via `/approve`)
 - **Parallel review queue** — persistent SQLite job queue + worker pool,
   hard cap of 6 concurrent agents, jobs can be appended from any terminal
-- **Sessions** — SQLite persistence, context compaction, FTS search (planned)
-- **Self-improvement** — skills, auto-memory, curator (stale detection,
-  dedupe), behavior rules in the system prompt
+- **Sessions** — SQLite persistence + FTS search, two-stage titles
+  (derived < llm < user), export (md/html), recap, leases, `/title`
+- **Self-improvement** — skills (frontmatter/triggers/linter/bundles),
+  curator lifecycle (paused/archived/pinned) with backups, learning graph,
+  behavior rules in the system prompt
+- **Safety** — credential files unreadable by tools, prompt-injection
+  warnings, self-repo guard, redacted tool output, result spill >50K
 
 ## Architecture
 
