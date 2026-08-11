@@ -1,7 +1,12 @@
 """Tests for the settings model (Task 1.3)."""
 import pytest
 
-from eaccode.config.settings import CuratorSettings, PermissionMode, Settings
+from eaccode.config.settings import (
+    CuratorSettings,
+    PermissionMode,
+    Settings,
+    SkillSettings,
+)
 
 
 def test_default_settings():
@@ -54,3 +59,15 @@ def test_curator_settings_roundtrip(tmp_path):
     loaded = Settings.load(file)
     assert loaded.curator.interval_hours == 48
     assert loaded.curator.stale_after_days == 30
+
+
+def test_skill_settings_defaults_and_roundtrip(tmp_path):
+    s = Settings()
+    assert s.skills.auto_load is True
+    assert s.skills.dirs == []
+    s = Settings(skills=SkillSettings(auto_load=False, dirs=["C:/x"]))
+    file = tmp_path / "eaccode.yaml"
+    s.save(file)
+    loaded = Settings.load(file)
+    assert loaded.skills.auto_load is False
+    assert loaded.skills.dirs == ["C:/x"]

@@ -24,6 +24,15 @@ KINDS = ("memory", "user", "soul")
 _BUDGETS = {"memory": MEMORY_BUDGET, "user": USER_BUDGET, "soul": SOUL_BUDGET}
 _FILENAMES = {"memory": "MEMORY.md", "user": "USER.md", "soul": "SOUL.md"}
 
+# A.8: first-run SOUL.md template — tone + working style guidance.
+SOUL_TEMPLATE = (
+    "# Working Style\n\n"
+    "- Be direct and honest; say when something is uncertain.\n"
+    "- Verify claims against real sources instead of guessing.\n"
+    "- Keep code, comments and CLI text in English.\n"
+    "- Prefer small, reviewable changes over big rewrites.\n"
+)
+
 
 class BudgetExceededError(ValueError):
     """Raised when a write would exceed the kind's char budget."""
@@ -121,7 +130,7 @@ class MarkdownMemoryStore:
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         templates = {
             "user": "# User Profile\n\n",
-            "soul": "# Working Style\n\n",
+            "soul": SOUL_TEMPLATE,
         }
         for kind, header in templates.items():
             path = self._path(kind)

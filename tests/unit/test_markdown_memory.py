@@ -67,6 +67,13 @@ class TestStore:
         # Idempotent.
         store.ensure_first_run()
 
+    def test_first_run_soul_has_template(self, tmp_path):
+        store = MarkdownMemoryStore(tmp_path)
+        store.ensure_first_run()
+        soul = store.read("soul")
+        assert "Working Style" in soul
+        assert "direct and honest" in soul  # A.8 template body
+
 
 class TestTools:
     @pytest.fixture

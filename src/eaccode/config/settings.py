@@ -28,6 +28,16 @@ class CuratorSettings(BaseModel):
     stale_after_days: int = 90
 
 
+class SkillSettings(BaseModel):
+    """A.7: skill loading configuration."""
+
+    auto_load: bool = True  # inject skills into the system prompt
+    dirs: list[str] = Field(
+        default_factory=list,
+        description="Extra skill directories (besides the default config dir)",
+    )
+
+
 class Settings(BaseModel):
     default_provider: str = "anthropic"
     default_model: str | None = None  # falls back to the provider's model
@@ -44,6 +54,7 @@ class Settings(BaseModel):
     save_sessions: bool = True
     ignore_rules: bool = False  # --ignore-rules: skip project context + memory
     hooks_enabled: bool = True  # P0.10: run hooks from config_dir/hooks/
+    skills: SkillSettings = SkillSettings()
     curator: CuratorSettings = CuratorSettings()
 
     @classmethod

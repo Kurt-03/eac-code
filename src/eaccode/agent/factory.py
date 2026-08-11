@@ -68,6 +68,7 @@ async def build_system_context_async(
     memory: MemoryStore | None = None,
     ignore_rules: bool = False,
     markdown_memory_dir: Path | None = None,
+    skills_auto_load: bool = True,  # A.7: settings.skills.auto_load
 ) -> SystemContext:
     """Compose the system prompt from project rules + memory + skills.
 
@@ -82,7 +83,7 @@ async def build_system_context_async(
     # injected as their own sections, next to the JSONL facts.
     md_memory_section = _markdown_memory_section(workdir, markdown_memory_dir)
     skills = ""
-    if skills_dirs and not ignore_rules:
+    if skills_dirs and not ignore_rules and skills_auto_load:
         loaded = discover_skills(skills_dirs)
         # P0.4: injected skills count as a use — the curator's stale
         # signal needs real usage, not edit mtimes.
@@ -230,10 +231,14 @@ async def build_agent_async(
     MarkdownMemoryStore(paths.memory_dir).ensure_first_run()
     sysctx = await build_system_context_async(
         workdir,
-        skills_dirs=[paths.skills_dir],
+        skills_dirs=[
+            paths.skills_dir,
+            *[Path(d) for d in settings.skills.dirs],  # A.7: extra dirs
+        ],
         memory=memory,
         ignore_rules=settings.ignore_rules,
         markdown_memory_dir=paths.memory_dir,
+        skills_auto_load=settings.skills.auto_load,
     )
     agent = AgentLoop(
         client,
