@@ -193,6 +193,21 @@ class TestComputerUseTool:
         assert result.is_error is True
         assert "Unknown" in result.content
 
+    @pytest.mark.asyncio
+    async def test_no_driver_graceful(self, ctx, monkeypatch):
+        """Same setup hint as the capture tool — no driver, no dispatch."""
+        from eaccode.tools.builtin.computer_use import (
+            ComputerUseInput,
+            ComputerUseTool,
+        )
+
+        monkeypatch.setattr("eaccode.tools.cua.driver_available", lambda: False)
+        result = await ComputerUseTool().run(
+            ComputerUseInput(action="click", element=1), ctx
+        )
+        assert result.is_error is True
+        assert "computer install" in result.content
+
 
 class TestRegistry:
     def test_tools_registered(self):

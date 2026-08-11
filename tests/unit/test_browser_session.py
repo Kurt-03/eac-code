@@ -272,3 +272,46 @@ class TestActions:
         assert "Dismissed" in out
         assert browser.session.dialog is None
         assert ws.sent[0]["params"]["accept"] is False
+
+
+class TestSessionLifecycle:
+    def test_drop_session_kills_self_launched_browser(self, monkeypatch):
+        """close must kill a browser we launched (P0.6 self-review finding);
+        a pre-existing browser (proc=None) is only disconnected."""
+        from eaccode.tools.builtin import browser as browser_tool
+
+        killed = []
+
+        class _Proc:
+            def kill(self):
+                killed.append(True)
+
+        class _Session:
+            def __init__(self):
+                self.closed = False
+
+            def close(self):
+                self.closed = True
+
+        class _Browser:
+            def __init__(self):
+                self.session = _Session()
+
+        monkeypatch.setattr(browser_tool, "kill_process_tree",
+                            lambda proc: proc.kill())
+        tool = browser_tool.BrowserTool()
+
+        # Self-launched: process gets killed.
+        mine = _Browser()
+        browser_tool._SESSIONS[7001] = (mine, _Proc())
+        tool._drop_session(7001)
+        assert mine.session.closed is True
+        assert killed == [True]
+        assert 7001 not in browser_tool._SESSIONS
+
+        # Pre-existing (proc=None): session closed, nothing killed.
+        theirs = _Browser()
+        browser_tool._SESSIONS[7002] = (theirs, None)
+        tool._drop_session(7002)
+        assert theirs.session.closed is True
+        assert len(killed) == 1  # unchanged

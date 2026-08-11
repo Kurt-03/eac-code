@@ -15,12 +15,15 @@ the DevTools endpoint.
 from __future__ import annotations
 
 import threading
+from typing import Any
 
 from pydantic import BaseModel, Field
 
+from eaccode._subprocess_compat import kill_process_tree
 from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
-_SESSIONS: dict[int, object] = {}
+# port -> (CdpBrowser, browser process or None if one was already running)
+_SESSIONS: dict[int, tuple[Any, Any | None]] = {}
 _SESSIONS_LOCK = threading.Lock()
 
 
@@ -172,14 +175,19 @@ class BrowserTool(Tool):
 
     def _get_browser(self, port: int, ctx: ToolContext) -> object:
         with _SESSIONS_LOCK:
-            browser = _SESSIONS.get(port)
-            if browser is not None:
-                return browser
-        from eaccode.tools.browser.session import CdpBrowser, _wait_for_endpoint, launch_browser
+            entry = _SESSIONS.get(port)
+            if entry is not None:
+                return entry[0]
+        from eaccode.tools.browser.session import (
+            CdpBrowser,
+            _wait_for_endpoint,
+            launch_browser,
+        )
 
+        proc = None
         if not _wait_for_endpoint(port, timeout=1.5):
             try:
-                self._proc = launch_browser(port=port)
+                proc = launch_browser(port=port)
             except FileNotFoundError as e:
                 raise RuntimeError(str(e)) from e
             if not _wait_for_endpoint(port, timeout=15):
@@ -188,11 +196,16 @@ class BrowserTool(Tool):
                 )
         browser = CdpBrowser.connect(port)
         with _SESSIONS_LOCK:
-            _SESSIONS[port] = browser
+            _SESSIONS[port] = (browser, proc)
         return browser
 
     def _drop_session(self, port: int) -> None:
+        """Close the CDP session and kill a browser we launched ourselves."""
         with _SESSIONS_LOCK:
-            browser = _SESSIONS.pop(port, None)
-        if browser is not None:
-            browser.session.close()
+            entry = _SESSIONS.pop(port, None)
+        if entry is None:
+            return
+        browser, proc = entry
+        browser.session.close()
+        if proc is not None:
+            kill_process_tree(proc)

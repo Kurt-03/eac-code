@@ -76,14 +76,9 @@ class _CuaBase:
     """Shared run plumbing: driver availability + dispatch + error wrap."""
 
     async def _run(self, action: str, **params) -> ToolResult:
-        if not cua.driver_available():
-            return ToolResult(
-                content=(
-                    "cua-driver not installed. Run `eaccode computer install` "
-                    "or set EACCODE_CUA_DRIVER to the binary path."
-                ),
-                is_error=True,
-            )
+        missing = _no_driver_result()
+        if missing is not None:
+            return missing
         try:
             reply = cua._dispatch(action, **params)
         except Exception as e:
@@ -92,6 +87,19 @@ class _CuaBase:
                 is_error=True,
             )
         return ToolResult(content=_format_reply(reply))
+
+
+def _no_driver_result() -> ToolResult | None:
+    """ToolResult setup hint when cua-driver is missing, else None."""
+    if cua.driver_available():
+        return None
+    return ToolResult(
+        content=(
+            "cua-driver not installed. Run `eaccode computer install` "
+            "or set EACCODE_CUA_DRIVER to the binary path."
+        ),
+        is_error=True,
+    )
 
 
 class ComputerUseCaptureTool(_CuaBase, Tool):
@@ -129,6 +137,9 @@ class ComputerUseTool(_CuaBase, Tool):
     requires_permission = True
 
     async def run(self, input: ComputerUseInput, ctx: ToolContext) -> ToolResult:
+        missing = _no_driver_result()
+        if missing is not None:
+            return missing
         a = input.action
         if input.bring_to_front:
             with contextlib.suppress(Exception):
