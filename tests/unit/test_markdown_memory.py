@@ -94,7 +94,10 @@ class TestStore:
 
     def test_trim_protects_headers(self, tmp_path):
         store = MarkdownMemoryStore(tmp_path)
-        store.write("user", "# User Profile\n\n- " + "y" * (USER_BUDGET + 100))
+        path = store._path("user")
+        path.write_text(
+            "# User Profile\n\n- " + "y" * (USER_BUDGET + 100), encoding="utf-8"
+        )
         removed = store.trim("user")
         assert removed >= 1
         assert store.read("user").startswith("# User Profile")
