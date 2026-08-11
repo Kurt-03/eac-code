@@ -75,4 +75,14 @@ src/eaccode/
 
 ## License
 
+MIT — see [LICENSE](LICENSE).
+
+**Design attribution:** the v0.5.0 TUI is modeled on the [Hermes Agent
+TUI](https://github.com/NousResearch/hermes-agent) (`ui-tui/`, MIT
+license, © Nous Research): fuzzy slash scoring (fuzzyScore.ts), the
+role-gutter message layout (roles.ts), the status rule (appChrome.tsx),
+and the color role system (theme.ts) were ported and adapted for
+eaccode. The original MIT copyright notice applies to those design
+elements.
+
 MIT
