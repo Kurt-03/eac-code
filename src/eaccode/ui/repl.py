@@ -479,10 +479,10 @@ class EaccodeApp(App):
         workdir = agent.config.workdir
 
         def _fire() -> None:
-            try:
+            from contextlib import suppress
+
+            with suppress(Exception):
                 run_hooks("session_end", workdir, hooks_dir=hooks_dir)
-            except Exception:
-                pass  # advisory — never break the exit
 
         threading.Thread(target=_fire, daemon=True).start()
 
