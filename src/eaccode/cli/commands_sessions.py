@@ -58,9 +58,8 @@ def sessions_list(limit: int, since: str | None, query: str | None) -> None:
 
 def _parse_since(value: str) -> datetime | None:
     """Parse --since: YYYY-MM-DD or relative (7d, 2w, 30d, 12h)."""
-    import re
 
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     value = value.strip()
     try:
