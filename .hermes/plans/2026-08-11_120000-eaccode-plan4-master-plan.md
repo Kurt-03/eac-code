@@ -665,14 +665,14 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Task | Status | Commit / Notiz |
 |---|---|---|
-| C.1 Review-Scheduler | ⬜ | — |
-| C.2 Review-Agent (Whitelist) | ⬜ | — |
-| C.3 Review-Ergebnis (Approval-Gate) | ⬜ | — |
-| C.4 Async-Delegation | ⬜ | — |
-| C.5 Curator-Lifecycle | ⬜ | — |
-| C.6 Curator-Backup | ⬜ | — |
-| C.7 Learning-Graph | ⬜ | — |
-| C.8 learn_prompt | ⬜ | — |
+| C.1 Review-Scheduler | ✅ | `f0d74b7` |
+| C.2 Review-Agent (Whitelist) | ✅ | `f0d74b7` |
+| C.3 Review-Ergebnis (Approval-Gate) | ✅ | `f0d74b7` |
+| C.4 Async-Delegation | ✅ | `3b12a75` |
+| C.5 Curator-Lifecycle | ✅ | `84c0168` |
+| C.6 Curator-Backup | ✅ | `84c0168` |
+| C.7 Learning-Graph | ✅ | `84c0168` |
+| C.8 learn_prompt | ✅ | `f0d74b7` (in REVIEW_PROMPT) |
 
 ### Phase D — Sessions & Titel
 
