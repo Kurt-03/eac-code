@@ -799,15 +799,15 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 
 | Cluster | Status | Notiz |
 |---|---|---|
-| J.1–J.6 (Insights, Debug, Reactions, Onboarding, Plugin-LLM, Pricing) | ⬜ | — |
-| J.7–J.12 (Credential-Pool, Range-Shift, SSL, Portal-Tags, i18n, Jiter) | ⬜ | — |
-| J.13–J.18 (Trajectory, Events/Emitter, Recipes, Monitoring, Store-Abstract, Manifest) | ⬜ | — |
-| J.19–J.24 (State, Protocol, Servers, Runtime-Provider, Model-Catalog, Model-Tools) | ⬜ | — |
-| J.25–J.30 (Provider-Catalog, Agent-Import, Blueprint, Security-Audit, Uninstall, Spinner) | ⬜ | — |
-| J.31–J.36 (Tips, Colors, Banner, Focus-View, Input-Sanitize, Middleware) | ⬜ | — |
-| J.37–J.42 (Lifecycle, Managed-Scope, Relaunch, Completion, Inventory, Thread-Context) | ⬜ | — |
-| J.43–J.48 (Tool-Gateway, Slash-Confirm, Project-Tools, Clarify-Gateway, Preview-Tools, Skills-Sync) | ⬜ | — |
-| J.49–J.54 (State, Constants, Evals, Assets, MCP-Data, Datagen) | ⬜ | — |
+| J.1–J.6 (Insights, Debug, Reactions, Onboarding, Plugin-LLM, Pricing) | 🟡 | J.2 ✅ `48861a8` (/debug) · J.4 ✅ (Hints) · J.6 ✅ (/cost per model) · J.1/J.3/J.5 optional |
+| J.7–J.12 (Credential-Pool, Range-Shift, SSL, Portal-Tags, i18n, Jiter) | 🟡 | J.9 ✅ `f4afe31` (ssl_verify) · J.7/J.8/J.10/J.11/J.12 optional |
+| J.13–J.18 (Trajectory, Events/Emitter, Recipes, Monitoring, Store-Abstract, Manifest) | 🟡 | J.15 ✅ `f4afe31` (recipes) · J.18 ✅ (manifest) · J.13/J.14/J.17 Verifikation · J.16 optional |
+| J.19–J.24 (State, Protocol, Servers, Runtime-Provider, Model-Catalog, Model-Tools) | 🟡 | J.22/J.23/J.24 Verifikation (ModelResolver, models-Cmd) · J.19 Verifikation (CuratorState/Leases) · J.20/J.21 optional |
+| J.25–J.30 (Provider-Catalog, Agent-Import, Blueprint, Security-Audit, Uninstall, Spinner) | 🟡 | J.25 ✅ `f4afe31` (catalog) · J.27 ✅ (recipes/blueprint) · J.30 Verifikation (Spinner) · J.26/J.28/J.29 optional |
+| J.31–J.36 (Tips, Colors, Banner, Focus-View, Input-Sanitize, Middleware) | 🟡 | J.31 ✅ /tips · J.34 ✅ /focus · J.35 ✅ (Sanitize) · J.32/J.33/J.36 Verifikation |
+| J.37–J.42 (Lifecycle, Managed-Scope, Relaunch, Completion, Inventory, Thread-Context) | 🟡 | J.37 Verifikation (Curator) · J.40 Verifikation (Suggester) · J.41 Verifikation (/status) · J.42 Verifikation (Review) · J.38/J.39 optional |
+| J.43–J.48 (Tool-Gateway, Slash-Confirm, Project-Tools, Clarify-Gateway, Preview-Tools, Skills-Sync) | 🟡 | J.44 ✅ `48861a8` (/clear confirm) · J.46/J.47 Verifikation (clarify/read-window) · J.43/J.45/J.48 optional |
+| J.49–J.54 (State, Constants, Evals, Assets, MCP-Data, Datagen) | ⬜ | alle optional/extern — bewusst offen |
 
 ### Phase K — Finale Verifikation
 
