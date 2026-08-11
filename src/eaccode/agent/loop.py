@@ -55,6 +55,10 @@ class AgentConfig:
     writer_id: str = "main"
     # P0.10: hooks directory (None → hooks disabled for this agent).
     hooks_dir: Path | None = None
+    # A.9: memory nudge — hint the user every N turns when no memory_*
+    # tool was used (0 = off). The REPL renders it via on_nudge.
+    memory_nudge_every_turns: int = 0
+    on_nudge: Callable[[str], None] | None = None
 
 
 @dataclass
@@ -98,6 +102,7 @@ class AgentLoop:
         total_usage = TokenUsage()
 
         self.guardrails.reset_for_turn()
+        self._memory_used_since_nudge = False
 
         for turn in range(self.config.max_turns):
             # P0.2: auto-compaction — when the window fills, demote the
@@ -105,6 +110,8 @@ class AgentLoop:
             self._maybe_auto_compact(messages)
             # A.6: trigger-matched skills enter the turn context.
             self._maybe_inject_triggered_skills(messages)
+            # A.9: memory nudge (every N turns without a memory_* call).
+            self._maybe_memory_nudge(turn)
             req = CompletionRequest(
                 messages=messages,
                 tools=tool_schemas,
@@ -140,6 +147,8 @@ class AgentLoop:
             for tc in resp.tool_calls:
                 if self.config.on_tool_call:
                     self.config.on_tool_call(tc)
+                if tc.name.startswith("memory_"):
+                    self._memory_used_since_nudge = True
                 result = await self._execute_guarded(tc, ctx)
                 messages.append(
                     Message.tool_result(
@@ -166,6 +175,18 @@ class AgentLoop:
                 model=model,
                 threshold=self.config.compact_threshold,
             )
+
+    def _maybe_memory_nudge(self, turn: int) -> None:
+        """A.9: hint once per window when no memory_* tool was used."""
+        every = self.config.memory_nudge_every_turns
+        if every <= 0 or self.config.on_nudge is None:
+            return
+        if turn > 0 and turn % every == 0 and not self._memory_used_since_nudge:
+            self.config.on_nudge(
+                "Tip: /memory shows what I know — /remember <fact> "
+                "saves durable project knowledge."
+            )
+            self._memory_used_since_nudge = False
 
     def _maybe_inject_triggered_skills(self, messages: list[Message]) -> None:
         """A.6: dynamic skill injection — trigger-matched skills enter the

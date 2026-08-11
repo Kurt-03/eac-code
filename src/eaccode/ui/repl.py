@@ -159,6 +159,9 @@ class EaccodeApp(App):
             log.write(write_warn(str(e)))
             return
         self._agent = agent
+        # A.9: memory nudge renders into the log.
+        if agent.config.memory_nudge_every_turns > 0:
+            agent.config.on_nudge = lambda msg: log.write(f"[dim]{msg}[/dim]")
         # P0.10: session_start hook (fire-and-forget, advisory).
         if agent.config.hooks_dir is not None:
             from eaccode.hooks.runner import run_hooks

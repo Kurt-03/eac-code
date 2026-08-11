@@ -642,11 +642,11 @@ Feature-Referenz, kein uncommitteter Stand am Tagesende.
 | A.3 Skill-Provenance + Usage-Backend | ✅ | `9ec6f07` |
 | A.4 Skill-Linter | ✅ | `a62e86d` |
 | A.5 skill_preprocessing (Template-Vars) | ✅ | `6bb61b2` |
-| A.6 Skill-Triggers + Pre-Filter | 🔄 | — |
-| A.7 skills_config | ⬜ | — |
-| A.8 default_soul | ⬜ | — |
-| A.9 Memory-Auto-Nudge | ⬜ | — |
-| A.10 memory_provider-Base | ⬜ | — |
+| A.6 Skill-Triggers + Pre-Filter | ✅ | `86eac5f` |
+| A.7 skills_config | ✅ | `02febf6` |
+| A.8 default_soul | ✅ | `02febf6` |
+| A.9 Memory-Auto-Nudge | 🔄 | — |
+| A.10 memory_provider-Base | 🔄 | — |
 | A.11 Lokale Skill-Bundles | ⬜ | — |
 | A.12 mem_trim | ⬜ | — |
 | A.13 Lokale Skills-Sammlung | ⬜ | — |

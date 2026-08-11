@@ -54,6 +54,10 @@ class Settings(BaseModel):
     save_sessions: bool = True
     ignore_rules: bool = False  # --ignore-rules: skip project context + memory
     hooks_enabled: bool = True  # P0.10: run hooks from config_dir/hooks/
+    memory_nudge_every_turns: int = Field(
+        default=5, ge=0,
+        description="A.9: hint to save memory every N turns (0 = off)",
+    )
     skills: SkillSettings = SkillSettings()
     curator: CuratorSettings = CuratorSettings()
 

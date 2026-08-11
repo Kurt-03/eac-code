@@ -254,6 +254,8 @@ async def build_agent_async(
             compact_threshold=settings.compact_threshold,
             # P0.10: hooks (config_dir/hooks; disabled via settings).
             hooks_dir=paths.hooks_dir if settings.hooks_enabled else None,
+            # A.9: memory nudge (settings.memory_nudge_every_turns; 0 = off).
+            memory_nudge_every_turns=settings.memory_nudge_every_turns,
         ),
     )
     for tool in registry.list():

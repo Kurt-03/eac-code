@@ -144,3 +144,42 @@ async def test_paused_session_rejects_tool_calls(tmp_path):
     assert len(tool_msgs) == 1
     assert "paused" in tool_msgs[0].text.lower()
     assert "resume" in tool_msgs[0].text.lower()
+
+
+# ---------------------------------------------------------------- A.9
+
+
+def _nudge_loop(tmp_path, nudges: list, every: int):
+    policy = PolicyEngine(PermissionMode.BYPASS_PERMISSIONS, RuleSet())
+    return AgentLoop(
+        MockClient([]), ToolRegistry(), policy,
+        AgentConfig(workdir=tmp_path, memory_nudge_every_turns=every,
+                    on_nudge=nudges.append),
+    )
+
+
+def test_memory_nudge_fires_once_per_window(tmp_path):
+    nudges: list[str] = []
+    loop = _nudge_loop(tmp_path, nudges, every=2)
+    loop._memory_used_since_nudge = False
+    loop._maybe_memory_nudge(1)
+    assert nudges == []
+    loop._maybe_memory_nudge(2)
+    assert len(nudges) == 1
+    loop._maybe_memory_nudge(3)
+    assert len(nudges) == 1  # reset after the nudge
+
+
+def test_memory_nudge_suppressed_by_memory_use(tmp_path):
+    nudges: list[str] = []
+    loop = _nudge_loop(tmp_path, nudges, every=2)
+    loop._memory_used_since_nudge = True
+    loop._maybe_memory_nudge(2)
+    assert nudges == []
+
+
+def test_memory_nudge_disabled_when_zero(tmp_path):
+    nudges: list[str] = []
+    loop = _nudge_loop(tmp_path, nudges, every=0)
+    loop._maybe_memory_nudge(10)
+    assert nudges == []
