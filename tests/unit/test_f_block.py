@@ -242,6 +242,19 @@ def test_resolver_timeout_kwarg():
     assert "timeout" not in resolver._base_kwargs(req)
 
 
+# ---------------------------------------------------------------- F.1
+
+
+def test_config_profile_override(tmp_path, monkeypatch):
+    from eaccode.config.paths import EaccodePaths
+
+    monkeypatch.setenv("EACCODE_CONFIG_DIR", str(tmp_path / "profile"))
+    paths = EaccodePaths()
+    assert paths.settings_file == tmp_path / "profile" / "eaccode.yaml"
+    assert paths.skills_dir == tmp_path / "profile" / "skills"
+    assert paths.sessions_dir == tmp_path / "profile" / "data" / "sessions"
+
+
 @pytest.mark.asyncio
 async def test_estop_flag_stops_tool_execution(tmp_path):
     import asyncio

@@ -43,9 +43,17 @@ class EaccodePaths:
     cron_db: Path
 
     def __init__(self) -> None:
-        cfg = _xdg_or_default("XDG_CONFIG_HOME", "user_config_dir")
-        dat = _xdg_or_default("XDG_DATA_HOME", "user_data_dir")
-        cache = _xdg_or_default("XDG_CACHE_HOME", "user_cache_dir")
+        # F.1: config profiles — EACCODE_CONFIG_DIR overrides everything.
+        profile = os.environ.get("EACCODE_CONFIG_DIR")
+        if profile:
+            base = Path(profile)
+            cfg = base
+            dat = base / "data"
+            cache = base / "cache"
+        else:
+            cfg = _xdg_or_default("XDG_CONFIG_HOME", "user_config_dir")
+            dat = _xdg_or_default("XDG_DATA_HOME", "user_data_dir")
+            cache = _xdg_or_default("XDG_CACHE_HOME", "user_cache_dir")
         object.__setattr__(self, "config_dir", cfg)
         object.__setattr__(self, "data_dir", dat)
         object.__setattr__(self, "cache_dir", cache)
