@@ -142,7 +142,7 @@ async def test_background_delegation_returns_immediately(tmp_path):
     async def fake_builder(workdir, max_turns=15):
         from eaccode.agent.loop import AgentConfig, AgentLoop
         from eaccode.config.settings import PermissionMode
-        from eaccode.llm.client import TokenUsage
+        from eaccode.llm.client import CompletionResponse, TokenUsage
         from eaccode.permissions.policy import PolicyEngine
         from eaccode.permissions.rules import RuleSet
         from eaccode.tools.base import ToolRegistry
@@ -170,12 +170,13 @@ async def test_background_delegation_returns_immediately(tmp_path):
     assert result.is_error is False
     assert "background" in result.content
     assert result.metadata.get("delegation_id") == 1
-    # Let the background task finish, then collect.
+    # Let the background task finish, then collect (once!).
+    collected: list[str] = []
     for _ in range(50):
-        if collect_background_results():
+        collected = collect_background_results()
+        if collected:
             break
         await asyncio.sleep(0.01)
-    collected = collect_background_results()
     assert any("[delegation #1]" in line for line in collected)
     assert results == ["background task"]
 
@@ -192,11 +193,12 @@ async def test_background_failure_is_collected(tmp_path):
         DelegateInput(goal="will fail", background=True), ctx
     )
     assert result.is_error is False  # the delegation itself succeeded
+    collected: list[str] = []
     for _ in range(50):
-        if collect_background_results():
+        collected = collect_background_results()
+        if collected:
             break
         await asyncio.sleep(0.01)
-    collected = collect_background_results()
     assert any("failed" in line for line in collected)
 
 
