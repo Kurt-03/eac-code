@@ -150,7 +150,9 @@ async def test_heartbeat_fires_periodically():
     heartbeat = Heartbeat(0.05, lambda: beats.append(1))
     heartbeat.start()
     try:
-        await asyncio.sleep(0.18)
+        # Windows timer granularity stretches 0.05s sleeps to ~0.12s —
+        # give the window plenty of room and only require ≥2 beats.
+        await asyncio.sleep(0.4)
     finally:
         heartbeat.stop()
     assert len(beats) >= 2
