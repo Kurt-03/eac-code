@@ -19,7 +19,7 @@ from eaccode.memory.skill_usage import record_use
 from eaccode.memory.skills import discover_skills, skills_to_system_prompt_section
 from eaccode.memory.store import MemoryStore
 from eaccode.permissions.policy import PolicyEngine
-from eaccode.permissions.rules import RuleSet
+from eaccode.permissions.rules import Rule, RuleSet
 from eaccode.tools.factory import build_default_registry
 
 # System-prompt cache (Phase D.2): the prompt has a stable structure
@@ -224,7 +224,14 @@ async def build_agent_async(
     registry = build_default_registry(allowed_tools)
     for tool in mcp_tools or []:
         registry.register(tool)
-    policy = PolicyEngine(mode=mode or settings.permission_mode, rules=RuleSet())
+    # P7/A.3: policy owns the session_rules list; AgentLoop shares the
+    # same list reference so 'a' decisions are visible on the next turn.
+    session_rules: list[Rule] = []
+    policy = PolicyEngine(
+        mode=mode or settings.permission_mode,
+        rules=RuleSet(),
+        session_rules=session_rules,
+    )
 
     memory = MemoryStore(paths.memory_dir)
     # P0.3: first-run setup of USER.md/SOUL.md (+ MEMORY.md dirs on demand).
@@ -249,19 +256,23 @@ async def build_agent_async(
         policy,
         AgentConfig(
             workdir=workdir,
-            max_turns=max_turns or settings.max_turns,  # F.37
-            max_budget_usd=settings.max_cost_usd,  # F.37: per-run cost cap
-            max_output_tokens=settings.max_output_tokens,  # F.33
-            system_prompt=sysctx.system_prompt,
-            # P0.2: auto-compaction settings (settings.yaml auto_compact /
-            # compact_threshold). The loop compacts when the window fills.
-            auto_compact=settings.auto_compact,
-            compact_threshold=settings.compact_threshold,
-            # P0.10: hooks (config_dir/hooks; disabled via settings).
-            hooks_dir=paths.hooks_dir if settings.hooks_enabled else None,
-            # A.9: memory nudge (settings.memory_nudge_every_turns; 0 = off).
-            memory_nudge_every_turns=settings.memory_nudge_every_turns,
-        ),
+                        max_turns=max_turns or settings.max_turns,  # F.37
+                        max_budget_usd=settings.max_cost_usd,  # F.37: per-run cost cap
+                        max_output_tokens=settings.max_output_tokens,  # F.33
+                        system_prompt=sysctx.system_prompt,
+                        # P7/A.4: dynamic skills need this to fire — without it,
+                        # _maybe_inject_triggered_skills returns early and skills
+                        # never enter the system context.
+                        skills_dir=paths.skills_dir,
+                        # P0.2: auto-compaction settings (settings.yaml auto_compact /
+                        # compact_threshold). The loop compacts when the window fills.
+                        auto_compact=settings.auto_compact,
+                        compact_threshold=settings.compact_threshold,
+                        # P0.10: hooks (config_dir/hooks; disabled via settings).
+                        hooks_dir=paths.hooks_dir if settings.hooks_enabled else None,
+                        # A.9: memory nudge (settings.memory_nudge_every_turns; 0 = off).
+                        memory_nudge_every_turns=settings.memory_nudge_every_turns,
+                    ),
     )
     for tool in registry.list():
         if tool.name == "delegate_task":

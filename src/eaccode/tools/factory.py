@@ -12,6 +12,7 @@ from eaccode.tools.base import Tool, ToolRegistry
 
 # Toolset key → tool names (Hermes CONFIGURABLE_TOOLSETS pattern).
 # "web" also carries web_fetch (eaccode's version of web_extract's HTTP layer).
+# P7/D.1: every name here must exist in _all_tools() (CI-checked in tests).
 TOOLSETS: dict[str, set[str]] = {
     "web": {"web_search", "web_fetch", "web_extract"},
     "terminal": {"bash", "process"},
@@ -22,7 +23,6 @@ TOOLSETS: dict[str, set[str]] = {
     "todo": {"todo_write"},
     "memory": {"memory_remember", "memory_recall", "memory_forget",
                "memory_edit"},
-    "session_search": {"session_search"},
     "clarify": {"clarify"},
     "delegation": {"delegate_task"},
     "cronjob": {"cronjob"},
@@ -34,7 +34,7 @@ TOOLSETS: dict[str, set[str]] = {
 # Default-on toolsets (everything except niche/opt-in ones).
 DEFAULT_TOOLSETS: set[str] = {
     "web", "terminal", "file", "code_execution", "skills", "todo",
-    "memory", "session_search", "clarify", "delegation", "cronjob",
+    "memory", "clarify", "delegation", "cronjob",
     "vision", "browser", "computer_use",
 }
 
@@ -68,6 +68,7 @@ def _all_tools() -> list[Tool]:
     from eaccode.tools.builtin.edit import EditTool
     from eaccode.tools.builtin.execute_code import ExecuteCodeTool
     from eaccode.tools.builtin.glob import GlobTool
+    from eaccode.tools.builtin.grep import GrepTool
     from eaccode.tools.builtin.process import ProcessTool
     from eaccode.tools.builtin.read import ReadTool
     from eaccode.tools.builtin.search_files import SearchFilesTool
@@ -75,6 +76,7 @@ def _all_tools() -> list[Tool]:
     from eaccode.tools.builtin.tool_search import ToolSearchTool
     from eaccode.tools.builtin.vision import VideoAnalyzeTool, VisionAnalyzeTool
     from eaccode.tools.builtin.web_extract import WebExtractTool
+    from eaccode.tools.builtin.web_fetch import WebFetchTool
     from eaccode.tools.builtin.web_search import WebSearchTool
     from eaccode.tools.builtin.write import WriteTool
 
@@ -84,6 +86,7 @@ def _all_tools() -> list[Tool]:
         EditTool(),
         BashTool(),
         GlobTool(),
+        GrepTool(),  # P7/A.1: was missing from the registry
         TodoWriteTool(),
         SkillCreateTool(),
         SkillPatchTool(),
@@ -101,6 +104,7 @@ def _all_tools() -> list[Tool]:
         CronjobTool(store_path=EaccodePaths().cron_db),
         SearchFilesTool(),
         WebExtractTool(),
+        WebFetchTool(),  # P7/A.1: was missing from the registry
         WebSearchTool(),  # G.6
         ToolSearchTool(),  # H.17
         ProcessTool(),
@@ -132,7 +136,7 @@ def build_default_registry(
         keep = set()
         for ts, names in TOOLSETS.items():
             if ts in enabled:
-                keep |= names
+                    keep |= names
         # context_engine tools are registered at runtime by plugins; the
         # toolset has no static names, so nothing to filter here.
         tools = [t for t in tools if t.name in keep]

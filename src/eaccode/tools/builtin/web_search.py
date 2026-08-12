@@ -1,6 +1,11 @@
-"""web_search tool (G.6) — keyless search via the provider registry."""
+"""web_search tool (G.6) — keyless search via the provider registry.
 
+P7/A.2: the underlying registry uses sync httpx — the tool runs it in
+a worker thread so the Textual event loop never blocks.
+"""
 from __future__ import annotations
+
+import asyncio
 
 from pydantic import BaseModel, Field
 
@@ -28,19 +33,27 @@ class WebSearchTool(Tool):
     async def run(self, input: WebSearchInput, ctx: ToolContext) -> ToolResult:
         if input.provider not in available_providers():
             return ToolResult(
-                content=f"Unknown provider {input.provider!r}. "
-                        f"Available: {', '.join(available_providers())}",
+                content=(
+                    f"Unknown provider {input.provider!r}. "
+                    f"Available: {', '.join(available_providers())}"
+                ),
                 is_error=True,
             )
-        results = search(input.query, input.limit, input.provider)
+        results = await asyncio.to_thread(
+            search, input.query, input.limit, input.provider
+        )
         if not results:
             return ToolResult(
-                content=f"No results for {input.query!r} (provider "
-                        f"{input.provider}).",
+                content=(
+                    f"No results for {input.query!r} "
+                    f"(provider {input.provider})."
+                ),
                 is_error=False,
             )
-        lines = [f"Search results for {input.query!r} "
-                 f"({len(results)} via {input.provider}):"]
+        lines = [
+            f"Search results for {input.query!r} "
+            f"({len(results)} via {input.provider}):"
+        ]
         for i, r in enumerate(results, 1):
             lines.append(f"{i}. {r.title}")
             lines.append(f"   {r.url}")

@@ -23,11 +23,14 @@ class Decision:
 # Hermes don't prompt for reads. "todo" was a tool name that does not
 # exist (it is todo_write), so the agent got asked permission to write
 # a todo list in default mode.
+# P7/A.1: skill_view is also a name that does not exist (the closest
+# tool is skill_list) — keep it out of the safe-list so we never claim
+# to auto-allow a tool that the registry does not actually contain.
 _SAFE_TOOLS = (
     "read", "glob", "grep", "search_files",
     "web_fetch", "web_extract", "web_search",
-    "tool_search", "clarify", "session_search",
-    "memory_recall", "skill_list", "skill_view",
+    "tool_search", "clarify",
+    "memory_recall", "skill_list",
     "todo_write",
 )
 
@@ -59,11 +62,16 @@ _MODE_DEFAULTS: dict[PermissionMode, dict[str, Action]] = {
 
 class PolicyEngine:
     def __init__(self, mode: PermissionMode, rules: RuleSet,
-                 allowlist=None) -> None:
+                 allowlist=None, session_rules=None) -> None:
         self.mode = mode
         self.rules = rules
         # P0.9: persistent allowlist consulted before the mode default.
         self.allowlist = allowlist
+        # P7/A.3: session_rules = "always (this run only)" entries
+        # created when the user picks (a) at an ASK prompt. Survive
+        # until the session ends, but yield to explicit DENY rules and
+        # to permanent allowlist entries.
+        self.session_rules: list[Rule] = session_rules or []
 
     def decide(self, tool: str, arguments: dict) -> Decision:
         deny_rule: Rule | None = None
@@ -78,6 +86,16 @@ class PolicyEngine:
 
         if deny_rule:
             return Decision(Action.DENY, f"Denied by rule: {deny_rule}", deny_rule)
+
+        # P7/A.3: session-rules win over the mode default (the user
+        # explicitly said "this session, allow this pattern").
+        for rule in self.session_rules:
+            if rule.matches(tool, arguments):
+                return Decision(
+                    Action.ALLOW,
+                    "Allowed by session rule",
+                    rule,
+                )
 
         # P0.9: an explicit allowlist entry wins over the mode default
         # (an "always" the user chose once must survive PLAN mode), but

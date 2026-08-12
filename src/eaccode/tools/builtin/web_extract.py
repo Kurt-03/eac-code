@@ -4,9 +4,13 @@ Complements web_fetch (which returns raw readable text) with a
 readability pass: boilerplate (nav/ads/footers) is stripped so the LLM
 gets the article body instead of a menu dump. Uses trafilatura when
 available; falls back to the stdlib parser.
-"""
 
+P7/A.2: sync httpx runs in a worker thread so the Textual event loop
+never blocks (was previously on the hot path).
+"""
 from __future__ import annotations
+
+import asyncio
 
 import httpx
 from pydantic import BaseModel, Field
@@ -16,7 +20,9 @@ from eaccode.tools.base import Tool, ToolClass, ToolContext, ToolResult
 
 class WebExtractInput(BaseModel):
     url: str = Field(description="URL to fetch and extract")
-    max_chars: int = Field(default=30_000, description="Max characters to return")
+    max_chars: int = Field(
+        default=30_000, description="Max characters to return"
+    )
 
 
 class WebExtractTool(Tool):
@@ -31,24 +37,35 @@ class WebExtractTool(Tool):
     requires_permission = False
 
     async def run(self, input: WebExtractInput, ctx: ToolContext) -> ToolResult:
+        return await asyncio.to_thread(self._run_sync, input)
+
+    def _run_sync(self, input: WebExtractInput) -> ToolResult:
         try:
             with httpx.Client(follow_redirects=True, timeout=30) as client:
-                resp = client.get(input.url, headers={"User-Agent": "eaccode/0.1"})
+                resp = client.get(
+                    input.url, headers={"User-Agent": "eaccode/0.1"}
+                )
                 resp.raise_for_status()
         except Exception as e:
-            return ToolResult(content=f"Error extracting {input.url}: {e}", is_error=True)
+            return ToolResult(
+                content=f"Error extracting {input.url}: {e}", is_error=True
+            )
 
         text = self._extract(resp.text)
         if not text.strip():
             return ToolResult(
-                content=f"No extractable content at {input.url} "
-                        f"(status {resp.status_code})",
+                content=(
+                    f"No extractable content at {input.url} "
+                    f"(status {resp.status_code})"
+                ),
                 is_error=True,
             )
         if len(text) > input.max_chars:
             text = text[: input.max_chars] + "\n[...truncated...]"
         return ToolResult(
-            content=f"Extracted from {input.url} (status {resp.status_code}):\n\n{text}",
+            content=(
+                f"Extracted from {input.url} (status {resp.status_code}):\n\n{text}"
+            ),
             metadata={"status": resp.status_code, "bytes": len(text)},
         )
 

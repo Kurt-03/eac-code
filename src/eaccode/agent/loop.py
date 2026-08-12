@@ -487,20 +487,23 @@ class AgentLoop:
                 content=f"Permission denied: {decision.reason}", is_error=True
             )
         if decision.action.value == "ask":
+            # P7/A.3: session_rules live on the PolicyEngine so subsequent
+            # turns see them too (one shared list).
+            session_rules = self.policy.session_rules
             if self.config.ask_async is not None:
                 # Phase B.1: in-REPL modal path (loop-safe Future await).
                 from eaccode.permissions.prompts import prompt_for_permission_async
 
                 granted = await prompt_for_permission_async(
                     tc.name, tc.arguments,
-                    session_rules=self.session_rules,
+                    session_rules=session_rules,
                     pause_flag=self.config.pause_flag,
                     ask_async=lambda q: self.config.ask_async(tc.name, tc.arguments, q),  # type: ignore[misc]
                 )
             else:
                 granted = prompt_for_permission(
                     tc.name, tc.arguments,
-                    session_rules=self.session_rules,
+                    session_rules=session_rules,
                     pause_flag=self.config.pause_flag,
                 )
             if not granted:

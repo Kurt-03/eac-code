@@ -1096,7 +1096,17 @@ class EaccodeApp(App):
                 self.loaded_skills.remove(name)
 
     def action_quit_or_cancel(self) -> None:
-        """Ctrl+C: cancel a running agent, otherwise quit the app."""
+        """Ctrl+C: pending ask -> deny; busy -> cancel; otherwise quit."""
+        # P7/A.5: Ctrl+C during a pending permission prompt is
+        # interpreted as 'n' (deny). The turn cancel is added because
+        # the user already said 'stop' — leaving the turn running
+        # would just make the next decision hang on another ASK.
+        pending = getattr(self, "_pending_permission", None)
+        if pending and pending.get("future"):
+            self._resolve_pending_permission("n")
+            self.query_one("#transcript", RichLog).write(
+                "[yellow]⏹ permission denied by Ctrl+C[/yellow]"
+            )
         if self._busy and self._current_task:
             # F.27/F.28: estop flag — the loop stops executing tools.
             flag = getattr(self, "_estop_flag", None)

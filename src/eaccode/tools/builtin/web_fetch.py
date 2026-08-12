@@ -1,9 +1,12 @@
 """WebFetch tool (Task 3.6) — fetch a URL and extract readable text.
 
 Uses a stdlib HTML parser (no extra deps); returns plain text + links.
+P7/A.2: sync httpx runs in a worker thread so the Textual event loop
+never blocks (was previously on the hot path).
 """
 from __future__ import annotations
 
+import asyncio
 from html.parser import HTMLParser
 
 import httpx
@@ -53,11 +56,18 @@ class WebFetchTool(Tool):
     requires_permission = False
 
     async def run(self, input: WebFetchInput, ctx: ToolContext) -> ToolResult:
+        return await asyncio.to_thread(self._run_sync, input)
+
+    def _run_sync(self, input: WebFetchInput) -> ToolResult:
         try:
             with httpx.Client(follow_redirects=True, timeout=30) as client:
-                resp = client.get(input.url, headers={"User-Agent": "eaccode/0.1"})
+                resp = client.get(
+                    input.url, headers={"User-Agent": "eaccode/0.1"}
+                )
         except Exception as e:
-            return ToolResult(content=f"Error fetching {input.url}: {e}", is_error=True)
+            return ToolResult(
+                content=f"Error fetching {input.url}: {e}", is_error=True
+            )
         if resp.status_code >= 400:
             return ToolResult(
                 content=f"HTTP {resp.status_code} for {input.url}", is_error=True
@@ -67,4 +77,6 @@ class WebFetchTool(Tool):
         text = parser.text()
         if len(text) > input.max_chars:
             text = text[: input.max_chars] + "\n[...truncated...]"
-        return ToolResult(content=text, metadata={"url": input.url, "chars": len(text)})
+        return ToolResult(
+            content=text, metadata={"url": input.url, "chars": len(text)}
+        )
