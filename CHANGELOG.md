@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.1.0 (2026-08-12) — Hermes / Claude-Code parity in Look & Feel
+
+Builds on v0.0.1 with the fully-realized TUI redesign. The TUI now looks
+and behaves like Hermes / Claude Code.
+
+### Streaming
+- In-place stream rendering inside the transcript (no separate static widget).
+- `StreamingMarkdownRenderer` (new) — incremental, O(1)-per-delta; the
+  renderer buffers only the partial markers (`**`, `*`, `` ` ``, ` ``` `)
+  until they close, never re-parsing the accumulated text.
+- Maximum renderer feed size = delta size (verified: the 50-delta repro
+  reports `max feed size: 4`, not 200).
+- No duplicate render at turn end (the stream is committed via
+  `renderer.finalize()` once, not re-emitted via `log.write`).
+
+### Permission
+- Inline prompt in the transcript (no ModalScreen).
+- **Color-coded unified diff** — file headers `---/+++` in bold blue,
+  hunk markers `@@` in bold cyan, removals in red, additions in green,
+  context in dim.
+- Tool-specific header subtitle: `bash` → command, `write` → path +
+  bytes, `edit` → path + replace hint, `read` → path.
+- Quick-Pick legend with all five keys: `y` once · `s` session ·
+  `a` always · `n` deny · `p` pause · `Esc` deny.
+- **New `PermissionChoice.ALLOW_SESSION`** — session-only remember;
+  no `allowlist.json` write. Press `s` to grant + remember-for-session.
+
+### Layout
+- Thin rule between transcript and composer (no boxes, no headers).
+- Single-column prompt glyph `❯` (was 2 columns).
+- Hermes-style status rule: busy indicator · model · git branch ·
+  context window · cost · cwd/session.
+- Slash-Overlay (filterable, ranked) and Cmd-K palette retained.
+
+### Cleanup
+- Removed the legacy `PermissionModal` class (Dead Code since v0.5.0).
+- Renamed `permission_diff.py` → `diff_renderer.py` (only the diff
+  helpers remain).
+- Added a regression test that pins the REPL never pushes a Modal.
+
+### Tests
+- `tests/integration/test_stream_50_deltas.py` — 50-delta streaming
+  reproducer (no LLM required).
+- `tests/integration/test_tui_screenshot.py` — SVG snapshot of three
+  scenarios (empty, streaming, permission prompt) under the
+  `integration` marker.
+- `tools/repro_stream_50_deltas.py` — manual probe.
+
+### Documentation
+- `docs/manual-test.md` — guided end-to-end probe (8 sections) to
+  verify the Herme parity in look and feel.
+- `README.md` rewritten with v0.0.1 → v0.1.0 highlights.
+
 ## v0.0.1 (2026-08-12) — Redesign-Start (Hermes/Claude-Code-Parity)
 
 First release of the redesigned TUI. The repository reverts to v0.0.1 as
