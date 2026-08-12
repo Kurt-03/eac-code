@@ -24,6 +24,7 @@ from eaccode.permissions.rules import Action, Rule
 
 class PermissionChoice(str, enum.Enum):  # noqa: UP042  (str value for JSON/schema compat)
     ALLOW_ONCE = "allow-once"
+    ALLOW_SESSION = "allow-session"  # v0.0.1: remember for the session, no persist
     ALLOW_ALWAYS = "allow-always"
     DENY = "deny"
     PAUSE = "pause"  # P0.8: pause the session — no further tool calls
@@ -128,14 +129,28 @@ def _handle_choice(
     session_rules: list[Rule] | None,
     pause_flag,
 ) -> bool:
-    """Shared choice handling for sync + async ask paths (P0.8)."""
+    """Shared choice handling for sync + async ask paths (P0.8).
+
+    Branching:
+    - ALLOW_ALWAYS: remember the rule in *session_rules* AND the caller
+      is responsible for persisting to the allowlist (via the policy
+      layer). This is the only path that touches persistent storage.
+    - ALLOW_SESSION: remember the rule in *session_rules* only. The rule
+      is lost on restart. No allowlist write.
+    - ALLOW_ONCE: grant the call, remember nothing.
+    - DENY / PAUSE: refuse.
+    """
     if choice == PermissionChoice.ALLOW_ALWAYS and session_rules is not None:
         _remember_rule(session_rules, tool, arguments)
     if choice == PermissionChoice.PAUSE:
         if pause_flag is not None:
             pause_flag.pause()
         return False
-    return choice in (PermissionChoice.ALLOW_ONCE, PermissionChoice.ALLOW_ALWAYS)
+    return choice in (
+        PermissionChoice.ALLOW_ONCE,
+        PermissionChoice.ALLOW_SESSION,
+        PermissionChoice.ALLOW_ALWAYS,
+    )
 
 
 def _remember_rule(session_rules: list[Rule], tool: str, arguments: dict) -> None:
