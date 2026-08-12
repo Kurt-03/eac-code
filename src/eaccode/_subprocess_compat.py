@@ -218,6 +218,11 @@ def kill_process_tree(proc: subprocess.Popen) -> None:
             pass
     with contextlib.suppress(OSError):
         proc.kill()
+    # D5 (audit): reap the child — without wait() the process stays a
+    # zombie and poll() keeps returning None (this is what broke
+    # test_kill_process_tree_swallows_errors).
+    with contextlib.suppress(Exception):
+        proc.wait(timeout=5)
     if IS_WINDOWS:
         with contextlib.suppress(Exception):
             subprocess.run(

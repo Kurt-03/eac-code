@@ -161,6 +161,13 @@ class ProcessTool(Tool):
         self._registry = _ProcessRegistry()
 
     async def run(self, input: ProcessInput, ctx: ToolContext) -> ToolResult:
+        # C3 (audit): spawn/poll/kill do blocking work (Popen, sleep
+        # loops) — never run them on the Textual event loop.
+        import asyncio
+
+        return await asyncio.to_thread(self._run_sync, input, ctx)
+
+    def _run_sync(self, input: ProcessInput, ctx: ToolContext) -> ToolResult:
         action = input.action.lower()
         if action == "spawn":
             if not input.command:

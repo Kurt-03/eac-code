@@ -182,24 +182,39 @@ class CronjobTool(Tool):
 
         G.5: ``no_agent`` jobs run their script directly and deliver its
         stdout verbatim — no LLM, no tokens (watchdog pattern).
+        C4 (audit): the subprocess calls run in a worker thread so the
+        Textual event loop never blocks.
         """
-        import subprocess
-        import sys
+        import asyncio
 
         if job.no_agent:
             if not job.script:
                 return "error", "no_agent job requires a script"
-            try:
-                proc = subprocess.run(
-                    [sys.executable, job.script],
-                    capture_output=True, text=True, timeout=600,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-                if proc.returncode == 0:
-                    return "success", proc.stdout.strip()[:50_000]
-                return "error", (proc.stderr or proc.stdout).strip()[:50_000]
-            except Exception as e:
-                return "error", f"{type(e).__name__}: {e}"
+            return await asyncio.to_thread(self._run_script_sync, job.script)
+        return await asyncio.to_thread(self._run_cli_sync, job)
+
+    @staticmethod
+    def _run_script_sync(script: str) -> tuple[str, str]:
+        import subprocess
+        import sys
+
+        try:
+            proc = subprocess.run(
+                [sys.executable, script],
+                capture_output=True, text=True, timeout=600,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if proc.returncode == 0:
+                return "success", proc.stdout.strip()[:50_000]
+            return "error", (proc.stderr or proc.stdout).strip()[:50_000]
+        except Exception as e:
+            return "error", f"{type(e).__name__}: {e}"
+
+    @staticmethod
+    def _run_cli_sync(job: CronJob) -> tuple[str, str]:
+        import subprocess
+        import sys
+
         try:
             cmd = [sys.executable, "-m", "eaccode", "run", "--print", "--prompt", job.prompt]
             if job.script:

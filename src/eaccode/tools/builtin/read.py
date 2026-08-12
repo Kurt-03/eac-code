@@ -40,7 +40,12 @@ class ReadTool(Tool):
         if not path.exists():
             return ToolResult(content=f"Error: file not found: {path}", is_error=True)
         try:
-            text = path.read_text(encoding="utf-8", errors="replace")
+            import asyncio
+
+            # C6 (audit): file I/O must not block the Textual event loop.
+            text = await asyncio.to_thread(
+                path.read_text, encoding="utf-8", errors="replace"
+            )
         except Exception as e:
             return ToolResult(content=f"Error reading file: {e}", is_error=True)
         lines = text.splitlines()

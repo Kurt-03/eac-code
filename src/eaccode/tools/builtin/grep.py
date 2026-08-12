@@ -32,9 +32,13 @@ class GrepTool(Tool):
         base = Path(input.path) if input.path else ctx.workdir
         if not base.is_absolute():
             base = ctx.workdir / base
+        # C1 (audit): subprocess calls must never block the Textual
+        # event loop — run them in a worker thread.
+        import asyncio
+
         if shutil.which("rg"):
-            return self._run_ripgrep(input, base)
-        return self._run_python_fallback(input, base)
+            return await asyncio.to_thread(self._run_ripgrep, input, base)
+        return await asyncio.to_thread(self._run_python_fallback, input, base)
 
     def _run_ripgrep(self, input: GrepInput, base: Path) -> ToolResult:
         cmd = ["rg", "--line-number", "--no-heading", "-e", input.pattern]
@@ -42,12 +46,15 @@ class GrepTool(Tool):
             cmd += ["-C", str(input.context)]
         if input.glob:
             cmd += ["-g", input.glob]
-        if base.is_file():
-            cmd.append(str(base))
-        else:
-            cmd.append(str(base))
+        # H5 (audit): dead if/else branch removed.
+        cmd.append(str(base))
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            from eaccode._subprocess_compat import windows_hide_flags
+
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30,
+                creationflags=windows_hide_flags(),  # D1: no cmd flash
+            )
         except subprocess.TimeoutExpired:
             return ToolResult(content="grep timed out after 30s", is_error=True)
         if proc.returncode == 1:  # no matches

@@ -36,7 +36,12 @@ class WriteTool(Tool):
         try:
             with lock_path(path):  # P0.5: per-path write coordination
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(input.content, encoding="utf-8")
+                import asyncio
+
+                # C6 (audit): file I/O must not block the Textual event loop.
+                await asyncio.to_thread(
+                    path.write_text, input.content, encoding="utf-8"
+                )
                 touch(path, writer_id=ctx.writer_id)  # P0.5: record the write
         except Exception as e:
             return ToolResult(content=f"Error writing file: {e}", is_error=True)

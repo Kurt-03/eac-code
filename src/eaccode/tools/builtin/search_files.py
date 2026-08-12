@@ -40,8 +40,11 @@ class SearchFilesTool(Tool):
 
         import shutil
 
+        # C2 (audit): never block the Textual event loop.
+        import asyncio
+
         if shutil.which("rg"):
-            return self._run_ripgrep(input, base)
+            return await asyncio.to_thread(self._run_ripgrep, input, base)
         # Fallback: reuse the grep tool's Python walker via a simple import.
         from eaccode.tools.builtin.grep import GrepInput, GrepTool
 
@@ -66,7 +69,12 @@ class SearchFilesTool(Tool):
             cmd += ["-g", input.file_glob]
         cmd.append(str(base))
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            from eaccode._subprocess_compat import windows_hide_flags
+
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30,
+                creationflags=windows_hide_flags(),  # D2: no cmd flash
+            )
         except subprocess.TimeoutExpired:
             return ToolResult(content="search_files timed out after 30s", is_error=True)
         if proc.returncode == 1:  # no matches

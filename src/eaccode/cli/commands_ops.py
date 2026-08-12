@@ -68,20 +68,42 @@ def update_command() -> None:
     """Check the git remote for newer commits (E.14, no auto-pull)."""
     import subprocess
 
+    from eaccode._subprocess_compat import bounded_git_probe, windows_hide_flags
+
+    # D3 (audit): git runs need the repo cwd, hidden windows and
+    # returncode checks — previously 'update' outside a repo printed
+    # raw 'fatal: not a git repository' and then a false claim.
+    root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True, text=True, timeout=10,
+        creationflags=windows_hide_flags(),
+        check=False,
+    )
+    if root.returncode != 0:
+        print_info("not a git repository — update check skipped")
+        return
+    repo_dir = root.stdout.strip()
     try:
-        subprocess.run(["git", "fetch", "--quiet"], timeout=30, check=False)
-        head = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
-            timeout=10,
-        ).stdout.strip()
-        remote = subprocess.run(
-            ["git", "rev-parse", "@{u}"], capture_output=True, text=True,
-            timeout=10,
-        ).stdout.strip()
-        count = subprocess.run(
+        fetch = subprocess.run(
+            ["git", "fetch", "--quiet"], timeout=30, check=False,
+            cwd=repo_dir, creationflags=windows_hide_flags(),
+        )
+        if fetch.returncode != 0:
+            print_error("git fetch failed — is the remote reachable?")
+            return
+        head = bounded_git_probe(
+            ["git", "rev-parse", "HEAD"], timeout=10,
+        ).strip()
+        remote = bounded_git_probe(
+            ["git", "rev-parse", "@{u}"], timeout=10,
+        ).strip()
+        if not head or not remote:
+            print_info("no upstream configured — update check skipped")
+            return
+        count = bounded_git_probe(
             ["git", "rev-list", "--count", f"{head}..{remote}"],
-            capture_output=True, text=True, timeout=10,
-        ).stdout.strip()
+            timeout=10,
+        ).strip()
         if count == "0":
             print_success("✓ up to date")
         else:

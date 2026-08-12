@@ -42,7 +42,10 @@ class EditTool(Tool):
         if not path.exists():
             return ToolResult(content=f"Error: file not found: {path}", is_error=True)
         try:
-            text = path.read_text(encoding="utf-8")
+            import asyncio
+
+            # C6 (audit): file I/O must not block the Textual event loop.
+            text = await asyncio.to_thread(path.read_text, encoding="utf-8")
         except Exception as e:
             return ToolResult(content=f"Error reading file: {e}", is_error=True)
         occurrences = text.count(input.old_string)
@@ -63,7 +66,12 @@ class EditTool(Tool):
             # P0.5: read-modify-write under the per-path lock, and record
             # the write for subagent conflict detection.
             with lock_path(path):
-                path.write_text(new_text, encoding="utf-8")
+                import asyncio
+
+                # C6 (audit): file I/O must not block the Textual event loop.
+                await asyncio.to_thread(
+                    path.write_text, new_text, encoding="utf-8"
+                )
                 touch(path, writer_id=ctx.writer_id)
         except Exception as e:
             return ToolResult(content=f"Error writing file: {e}", is_error=True)
