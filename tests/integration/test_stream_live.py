@@ -11,9 +11,17 @@ from eaccode.config.providers import load_providers
 from eaccode.llm.client import CompletionRequest, LLMClient
 from eaccode.llm.models import Message
 
+def _has_live_provider() -> bool:
+    try:
+        providers = load_providers(EaccodePaths().providers_file)
+    except Exception:
+        return False
+    return any(bool(p.api_key) for p in providers)
+
+
 pytestmark = pytest.mark.skipif(
-    not load_providers(EaccodePaths().providers_file),
-    reason="no providers configured",
+    not _has_live_provider(),
+    reason="no provider with an API key configured",
 )
 
 
