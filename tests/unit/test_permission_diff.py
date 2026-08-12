@@ -11,7 +11,7 @@ from eaccode.permissions.prompts import (
     prompt_for_permission_async,
 )
 from eaccode.permissions.rules import Action, Rule
-from eaccode.ui.permission_diff import (
+from eaccode.ui.diff_renderer import (
     build_unified_diff,
     diff_for_write,
 )

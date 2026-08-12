@@ -16,12 +16,8 @@ The test is marked ``integration`` and runs against a mocked agent loop
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
-
-import pytest
 
 from eaccode.tui.streaming_md import StreamingMarkdownRenderer
-
 
 # ---------------------------------------------------------------------------
 # Helpers
