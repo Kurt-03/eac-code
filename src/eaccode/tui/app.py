@@ -148,8 +148,10 @@ class EaccodeApp(App):
         self._model_name = ""
         self._mode_name = ""
         # I2 (audit): prompt history (up/down), Hermes-style.
+        # P7/E.1: persisted to config_dir/history.json (survives restart).
         self._input_history: list[str] = []
         self._history_idx: int | None = None
+        self._load_input_history()
         self._show_reasoning = False
         self._total_usage = TokenUsage()
         self._usage_by_model: dict[str, TokenUsage] = {}  # J.6: per-model
@@ -302,8 +304,10 @@ class EaccodeApp(App):
         # J.4: onboarding hints for fresh sessions (first run of the app).
         if not self.messages and not getattr(self, "_onboarding_done", False):
             self._onboarding_done = True
-            log.write("[dim]Hints: /help lists commands · @file:path injects "
-                      "files · /mode safeAuto auto-approves safe bash[/dim]")
+            # P7/E.2: Hermes-style branding banner so the empty
+            # transcript is not two grey lines.
+            for line in self._render_onboarding():
+                log.write(line)
 
     def on_input_changed(self, event) -> None:
         """v0.5.0: update the Hermes-style fuzzy slash overlay."""
@@ -322,8 +326,27 @@ class EaccodeApp(App):
         except Exception:
             pass
 
+    def _render_onboarding(self) -> list[str]:
+        """P7/E.2: banner lines for the first empty session.
+
+        Exposed so tests can assert on the rendered text without spinning
+        up the whole TUI.
+        """
+        from eaccode import __version__ as _v
+        return [
+            f"[bold cyan]eaccode[/bold cyan] [dim]v{_v}[/dim]",
+            "[dim]Plan7 — autonomous coding-agent CLI (BYOK)[/dim]",
+            ("[dim]Hints: /help lists commands · @file:path injects "
+             "files · /mode safeAuto auto-approves safe bash[/dim]"),
+        ]
+
     def _remember_prompt(self, text: str) -> None:
-        """Push a submitted prompt onto the history (I2, Hermes-style)."""
+        """Push a submitted prompt onto the history (I2, Hermes-style).
+
+        P7/E.1: also persist to disk (config_dir/history.json) so the
+        up/down arrows work across restarts. Deduped against the last
+        entry (pressing the same prompt twice should not push two rows).
+        """
         if not text or text.startswith("/"):
             return
         if self._input_history and self._input_history[-1] == text:
@@ -331,6 +354,39 @@ class EaccodeApp(App):
         self._input_history.append(text)
         del self._input_history[:-50]  # cap
         self._history_idx = None
+        self._save_input_history()
+
+    def _history_path(self) -> Path:
+            """P7/E.1: config_dir/history.json (XDG-style on Linux)."""
+            from eaccode.config.paths import EaccodePaths
+            return EaccodePaths().config_dir / "history.json"
+
+    def _load_input_history(self) -> None:
+            """Load persisted history; ignore corrupt files (Plan7/Hygiene)."""
+            path = self._history_path()
+            try:
+                import json
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                return
+            if isinstance(data, list):
+                # Keep only the last 50 plain strings.
+                self._input_history = [s for s in data if isinstance(s, str)][-50:]
+
+    def _save_input_history(self) -> None:
+            """Persist history atomically; never raise (UI must keep working)."""
+            path = self._history_path()
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                import json
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(
+                    json.dumps(self._input_history, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                tmp.replace(path)
+            except OSError:
+                pass  # read-only filesystem, locked file, etc.
 
     def _queue_prompt(self, text: str) -> None:
         """P7/B.2: remember a user prompt and start a follow-up turn.
@@ -780,6 +836,13 @@ class EaccodeApp(App):
             log.write(f"[dim italic]🧠 {esc(capped)}{esc(suffix)}[/dim italic]")
 
         def on_tool_call(tc: ToolCall) -> None:
+            # P7/D.3: record the call so resume can show tool history.
+            self.messages.append({
+                "role": "tool_call",
+                "tool_name": tc.name,
+                "tool_call_id": tc.id,
+                "arguments": tc.arguments,
+            })
             _hide_spinner()
             self._stream_text = ""
             # v0.0.1: flush any pending streaming fragment, then reset the
@@ -813,6 +876,18 @@ class EaccodeApp(App):
                     log.write(f"[dim]{CHEVRON} {esc(card.call)}[/dim]")
 
         def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
+            # P7/D.3: keep the tool step in self.messages so /resume (or
+            # any future consumer) sees what the agent did. The summary
+            # line is a flat plain-text row — same shape as the user /
+            # assistant rows already there.
+            self.messages.append({
+                "role": "tool",
+                "tool_name": tc.name,
+                "tool_call_id": tc.id,
+                "is_error": result.is_error,
+                "content": (result.content or "")[:4000],
+            })
+
             import time
 
             from rich.markup import escape as esc

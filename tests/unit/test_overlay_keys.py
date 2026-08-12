@@ -9,7 +9,7 @@ async def test_overlay_arrows_fire_when_overlay_active(tmp_path):
     app = EaccodeApp(workdir=tmp_path)
     await _prepare_app(tmp_path, None, app)
 
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._overlay.update("/")
         # Sanity: the overlay lists all commands.
         assert app._overlay.items
@@ -28,7 +28,7 @@ async def test_escape_clears_overlay_but_not_pending(tmp_path):
     app = EaccodeApp(workdir=tmp_path)
     await _prepare_app(tmp_path, None, app)
 
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._overlay.update("/")
         assert app._overlay.items
         app.on_key(_FakeKey("escape"))

@@ -1,4 +1,4 @@
-"""P7/C.1: every cell of the Mode × Tool matrix is asserted.
+"""P7/C.1: every cell of the Mode x Tool matrix is asserted.
 
 The decision table is documented in
 ``eaccode.permissions.policy`` — one assertion here per cell,
@@ -10,7 +10,6 @@ import pytest
 from eaccode.config.settings import PermissionMode
 from eaccode.permissions.policy import PolicyEngine
 from eaccode.permissions.rules import Action, Rule, RuleSet
-
 
 # (mode, tool, expected_action, label)
 CELLS: list[tuple[PermissionMode, str, Action, str]] = [
