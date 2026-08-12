@@ -44,23 +44,46 @@ def render_permission_prompt(tool: str, args: dict,
                              diff: str | None = None) -> str:
     """Inline permission question (Phase B). Flat text, no box.
 
-    All bracket-heavy content (the [y]/[a]/[n]/[p] legend, argument
-    values, diff lines) is Rich-markup-escaped: the transcript Log runs
-    with ``markup=True``, and unescaped ``[y]``/``[x ...]`` would be
-    parsed as style tags and silently eaten (v0.5.3 bug).
+    v0.0.1: the diff lines are colored (red ``-``, green ``+``, cyan
+    ``@@``, blue file headers) instead of being escaped plain. The
+    toolkit arguments and the legend are still escaped (``[y]``/``[a]``
+    etc. would otherwise be eaten as style tags by Rich — v0.5.3 bug).
     """
     lines = [f"‖ Allow {_escape(tool)}?"]
     for key, value in _args_summary_dict(args).items():
         lines.append(f"‖   {_escape(key)}: {_escape(value)}")
     if diff:
         for dline in diff.splitlines()[:30]:
-            lines.append(f"‖   {_escape(dline)}")
+            lines.append(f"‖   {_render_diff_line(dline)}")
     lines.append("‖")
     lines.append(
         "‖   " + _escape("[y] once    [s] session    [a] always    "
                          "[n] deny    [p] pause    [Esc] deny")
     )
     return "\n".join(lines)
+
+
+def _render_diff_line(line: str) -> str:
+    """Render a single diff line with the appropriate Rich markup.
+
+    - file headers (``--- a/...``, ``+++ b/...``) → bold blue
+    - hunk markers (``@@ -... +... @@``) → bold cyan
+    - insertions (``+...``) → green
+    - deletions (``-...``) → red
+    - context lines (`` ...``) → dim
+    - everything else → escaped plain
+    """
+    if line.startswith("---") or line.startswith("+++"):
+        return f"[bold blue]{_escape(line)}[/bold blue]"
+    if line.startswith("@@"):
+        return f"[bold cyan]{_escape(line)}[/bold cyan]"
+    if line.startswith("+"):
+        return f"[green]{_escape(line)}[/green]"
+    if line.startswith("-"):
+        return f"[red]{_escape(line)}[/red]"
+    if line.startswith(" "):
+        return f"[dim]{_escape(line)}[/dim]"
+    return _escape(line)
 
 
 def _escape(text: str) -> str:

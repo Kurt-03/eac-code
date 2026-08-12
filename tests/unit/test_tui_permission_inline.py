@@ -102,3 +102,43 @@ def test_inline_prompt_lists_all_keys_with_descriptions():
         assert key in plain, f"missing key {key} in prompt: {plain!r}"
     for label in ("once", "session", "always", "deny", "pause"):
         assert label in plain, f"missing label {label!r} in prompt: {plain!r}"
+
+
+# ---------------------------------------------------------------------------
+# v0.0.1: colored diff — red `-`, green `+`, cyan `@@`, blue `---/+++`
+# ---------------------------------------------------------------------------
+
+
+def test_diff_uses_color_markup():
+    """Diff lines must carry Rich markup colors (red -/green +/cyan @@)."""
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt(
+        "write", {"path": "x.py"},
+        diff="--- a/x.py\n+++ b/x.py\n@@ -1,1 +1,1 @@\n-old\n+new",
+    )
+    # The raw markup must contain style tags for minus/plus/hunk/header.
+    assert "[red]-old[/red]" in text, (
+        f"missing red markup for minus line: {text!r}"
+    )
+    assert "[green]+new[/green]" in text, (
+        f"missing green markup for plus line: {text!r}"
+    )
+    assert "[bold cyan]" in text, "missing bold cyan markup for hunk header"
+    assert "[bold blue]" in text, "missing bold blue markup for file headers"
+
+
+def test_diff_render_preserves_visible_text():
+    """The diff's plain (visible) text is unchanged — only colors added."""
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    diff = "--- a/x.py\n+++ b/x.py\n@@ -1,1 +1,1 @@\n-old\n+new"
+    text = render_permission_prompt("write", {"path": "x.py"}, diff=diff)
+    plain = render(text).plain
+    # The plain rendering must show the diff unchanged.
+    assert "--- a/x.py" in plain
+    assert "+++ b/x.py" in plain
+    assert "-old" in plain
+    assert "+new" in plain
