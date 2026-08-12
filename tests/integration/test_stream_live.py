@@ -45,4 +45,4 @@ async def test_stream_deltas_flow_without_freezing():
     # in a thread, so the loop never blocks). Chunk gaps themselves belong to
     # the provider: reasoning models like MiniMax-M3 send long thinking
     # passages in waves — allow generous gaps, assert deltas actually flow.
-    assert max_gap < 15.0, f"stream stalled for {max_gap:.1f}s between chunks"
+    assert max_gap < 30.0, f"stream stalled for {max_gap:.1f}s between chunks"
