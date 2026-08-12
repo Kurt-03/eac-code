@@ -114,7 +114,7 @@ async def prompt_for_permission_async(
     future = ask_async(question)
     try:
         choice = await asyncio.wait_for(future, timeout=timeout)
-    except TimeoutError:
+    except (TimeoutError, asyncio.CancelledError):
         choice = PermissionChoice.DENY  # modal timed out / never resolved
     except Exception:
         choice = PermissionChoice.DENY  # modal failed — fail closed

@@ -384,8 +384,22 @@ class EaccodeApp(App):
         return future
 
     def _restore_input_after_permission(self, fut) -> None:
-        """Clean up after a permission ask settles: re-enable + refocus."""
+        """Clean up after a permission ask settles: re-enable + refocus.
+
+        If the ask expired (600s timeout in prompts.py), the future is
+        cancelled and the deny happens silently — say so in the
+        transcript, otherwise the prompt looks still active and every
+        key appears dead (v0.5.3 bug).
+        """
         self._pending_permission = None
+        if fut.cancelled():
+            from contextlib import suppress
+
+            with suppress(Exception):
+                self.query_one("#transcript", RichLog).write(
+                    "[yellow]⏱ permission request timed out — "
+                    "automatically denied[/yellow]"
+                )
         try:
             self.query_one("#input", Input).disabled = False
             self.query_one("#input", Input).focus()

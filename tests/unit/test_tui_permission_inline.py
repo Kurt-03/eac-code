@@ -11,15 +11,51 @@ def test_inline_prompt_header():
 
 
 def test_inline_prompt_keys_line():
+    """v0.5.3: the [y]/[a]/[n]/[p] legend must SURVIVE Rich markup —
+    the transcript Log runs with markup=True, which previously parsed
+    the keys as style tags and silently ate them."""
+    from rich.markup import render
+
     from eaccode.tui.render import render_permission_prompt
 
     text = render_permission_prompt("write", {"path": "x.py",
                                               "content": "hello"})
-    assert "[y] once" in text
-    assert "[a] always" in text
-    assert "[n] deny" in text
-    assert "[p] pause" in text
-    assert "[Esc] deny" in text
+    # Raw string carries the escapes…
+    assert "\\[y] once" in text
+    # …and the rendered text shows every key.
+    plain = render(text).plain
+    assert "[y] once" in plain
+    assert "[a] always" in plain
+    assert "[n] deny" in plain
+    assert "[p] pause" in plain
+    assert "[Esc] deny" in plain
+
+
+def test_markup_in_diff_is_preserved():
+    """v0.5.3: code like ``[x for x in y]`` in a diff must not be eaten
+    by the Rich markup parser."""
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt(
+        "write", {"path": "a.py"},
+        diff="+print([x for x in y])",
+    )
+    plain = render(text).plain
+    assert "+print([x for x in y])" in plain
+
+
+def test_markup_in_args_is_preserved():
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt(
+        "write", {"path": "a.py", "content": "x = [red, green]"},
+    )
+    plain = render(text).plain
+    assert "x = [red, green]" in plain
 
 
 def test_inline_prompt_includes_diff_when_provided():

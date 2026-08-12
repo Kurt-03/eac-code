@@ -42,17 +42,30 @@ def render_message(role: str, content: str, *,
 
 def render_permission_prompt(tool: str, args: dict,
                              diff: str | None = None) -> str:
-    """Inline permission question (Phase B). Flat text, no box."""
-    lines = [f"‖ Allow {tool}?"]
+    """Inline permission question (Phase B). Flat text, no box.
+
+    All bracket-heavy content (the [y]/[a]/[n]/[p] legend, argument
+    values, diff lines) is Rich-markup-escaped: the transcript Log runs
+    with ``markup=True``, and unescaped ``[y]``/``[x ...]`` would be
+    parsed as style tags and silently eaten (v0.5.3 bug).
+    """
+    lines = [f"‖ Allow {_escape(tool)}?"]
     for key, value in _args_summary_dict(args).items():
-        lines.append(f"‖   {key}: {value}")
+        lines.append(f"‖   {_escape(key)}: {_escape(value)}")
     if diff:
         for dline in diff.splitlines()[:30]:
-            lines.append(f"‖   {dline}")
+            lines.append(f"‖   {_escape(dline)}")
     lines.append("‖")
-    lines.append("‖   [y] once    [a] always    [n] deny    "
-                 "[p] pause    [Esc] deny")
+    lines.append("‖   " + _escape("[y] once    [a] always    [n] deny    "
+                                  "[p] pause    [Esc] deny"))
     return "\n".join(lines)
+
+
+def _escape(text: str) -> str:
+    """Escape Rich markup brackets (``[``/``]`` → ``\\[...]``)."""
+    from rich.markup import escape as _rich_escape
+
+    return _rich_escape(text)
 
 
 def _args_summary(args: dict) -> str:

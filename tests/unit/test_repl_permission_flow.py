@@ -154,6 +154,48 @@ async def test_submit_while_busy_is_ignored(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_permission_timeout_logs_denial_and_restores_input(tmp_path):
+    """v0.5.3: when the 600s ask expires, the future is cancelled —
+    the transcript must say so (otherwise the prompt looks live and
+    every key appears dead) and the input must be restored."""
+
+    from textual.widgets import Input, RichLog
+
+    from eaccode.ui.repl import EaccodeApp
+
+    app = EaccodeApp(workdir=tmp_path)
+    agent, _client = _make_agent(tmp_path, app._ask_permission_async)
+    await _prepare_app(tmp_path, agent, app)
+
+    async with app.run_test() as pilot:
+        inp = app.query_one("#input", Input)
+        inp.value = "schreibe out.txt"
+        await pilot.press("enter")  # real submit path (busy + done callback)
+        assert await _wait_for(app, lambda: getattr(
+            app, "_pending_permission", None) is not None
+        ), "permission prompt never became pending"
+
+        # Simulate prompts.py's wait_for timeout: cancel the future.
+        pending = app._pending_permission
+        pending["future"].cancel()
+        assert await _wait_for(app, lambda: getattr(
+            app, "_pending_permission", None) is None
+        ), "pending never cleared after timeout"
+        assert app.query_one("#input", Input).disabled is False
+        # Denied: no file was written.
+        assert not (tmp_path / "out.txt").exists()
+
+        transcript_text = "".join(
+            str(line) for line in app.query_one(
+                "#transcript", RichLog).lines
+        )
+        assert "timed out" in transcript_text
+
+        # The turn completes (denied tool result -> final answer).
+        assert await _wait_for(app, lambda: not app._busy, tries=300)
+
+
+@pytest.mark.asyncio
 async def test_permission_key_y_writes_file_and_restores_input(tmp_path):
     from textual.widgets import Input
 
