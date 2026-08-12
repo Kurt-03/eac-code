@@ -242,10 +242,16 @@ def build_tool_label(tool_name: str, args: dict, max_len: int | None = None) -> 
     """
     verb = _TOOL_VERBS.get(tool_name)
     if verb is None:
+        # G6 (audit): don't forward None into an int-typed slot.
+        if max_len is None:
+            return build_tool_preview(tool_name, args)
         return build_tool_preview(tool_name, args, max_len=max_len)
     if tool_name in _TOOL_VERBS_NO_PREVIEW:
         return verb
-    preview = build_tool_preview(tool_name, args, max_len=max_len)
+    if max_len is None:
+        preview = build_tool_preview(tool_name, args)
+    else:
+        preview = build_tool_preview(tool_name, args, max_len=max_len)
     if not preview:
         return verb
     if tool_name in _TOOL_VERBS_FOR_CONNECTOR:

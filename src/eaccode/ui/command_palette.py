@@ -68,7 +68,7 @@ class CommandPalette(ModalScreen):
             return
         item = view.children[view.index]
         static = item.query_one(Static)
-        name = static.id.removeprefix("pal-")
+        name = (static.id or "").removeprefix("pal-")
         self._on_run(f"/{name}")
         self.dismiss()
 

@@ -89,7 +89,7 @@ async def agent_runner(job: Job, workdir: Path) -> tuple[str, float]:
         **popen_kwargs,
     )
     if proc.returncode != 0:
-        raise RuntimeError((proc.stderr or b"").decode()[:500])
+        raise RuntimeError(str(proc.stderr or "")[:500])
     try:
         data = json.loads(proc.stdout.decode())
         return data.get("result", ""), data.get("cost_usd", 0.0)

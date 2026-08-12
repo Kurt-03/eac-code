@@ -343,6 +343,15 @@ class EaccodeApp(App):
                       "or press Ctrl+C[/dim]")
             return
 
+        # G9 (audit): if the agent build failed at startup, say so
+        # instead of letting run_streaming crash on None.
+        if self._agent is None:
+            from eaccode.ui.messages import write_error
+
+            log.write(write_error("Agent not ready — check provider "
+                                  "setup (eaccode doctor)"))
+            return
+
         self.messages.append({"role": "user", "content": text})
         self._last_prompt = text
         self._busy = True

@@ -183,7 +183,7 @@ class DelegateTool(Tool):
             return task.goal, result.content, result.is_error
 
         try:
-            results = await asyncio.gather(*[_one(t) for t in input.tasks])
+            results = await asyncio.gather(*[_one(t) for t in (input.tasks or [])])
         except Exception as e:
             return ToolResult(
                 content=f"Batch delegation failed: {type(e).__name__}: {e}",

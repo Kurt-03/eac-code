@@ -156,7 +156,12 @@ def cua_focus_app(app: str, raise_window: bool = False) -> dict:
 
 def cua_capture_after(mode: str = "som", **action_params) -> dict:
     """Run an action, then capture for verification (single driver call)."""
-    return _dispatch("capture_after", mode=mode, action=action_params)
+    # G5 (audit): the driver's action slot is a string — serialize the
+    # nested action dict instead of passing it raw.
+    import json
+
+    return _dispatch("capture_after", mode=mode,
+                     action=json.dumps(action_params))
 
 
 # ------------------------------------------------------- typed-browser route

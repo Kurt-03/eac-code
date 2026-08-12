@@ -122,7 +122,7 @@ class Scheduler:
     async def tick_once(self) -> list[CronJob]:
         """Run all due jobs; returns the executed jobs."""
         executed: list[CronJob] = []
-        for job in self.store.due_jobs():
+        for job in (self.store.due_jobs() or []):
             executed.append(job)
             await self._execute(job)
         return executed
