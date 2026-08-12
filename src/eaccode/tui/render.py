@@ -56,8 +56,10 @@ def render_permission_prompt(tool: str, args: dict,
         for dline in diff.splitlines()[:30]:
             lines.append(f"‖   {_escape(dline)}")
     lines.append("‖")
-    lines.append("‖   " + _escape("[y] once    [a] always    [n] deny    "
-                                  "[p] pause    [Esc] deny"))
+    lines.append(
+        "‖   " + _escape("[y] once    [s] session    [a] always    "
+                         "[n] deny    [p] pause    [Esc] deny")
+    )
     return "\n".join(lines)
 
 

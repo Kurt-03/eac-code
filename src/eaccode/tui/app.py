@@ -28,7 +28,7 @@ from eaccode.ui.commands import handle_command
 
 
 class PermissionAwareInput(Input):
-    """Input that hands y/a/n/p/Esc to the app while a permission is pending.
+    """Input that hands y/s/a/n/p/Esc to the app while a permission is pending.
 
     ``Input._on_key`` is async in Textual 8 and stops printable keys to
     insert them as text — which is exactly why bare ``App.on_key`` never
@@ -36,6 +36,9 @@ class PermissionAwareInput(Input):
     checks the app's pending ask first and resolves it instead of
     inserting the character; otherwise it must ``await`` the base
     handler (a sync call would drop the insert coroutine).
+
+    v0.0.1: the **s** key adds the ALLOW_SESSION quick-pick (session-only
+    remember — not persisted to allowlist.json).
 
     I2 (audit): up/down also navigate the prompt history when the app
     has one (Hermes' useInputHistory behaviour).
@@ -45,7 +48,7 @@ class PermissionAwareInput(Input):
         app = self.app
         if getattr(app, "_pending_permission", None):
             key = event.key.lower()
-            if key in ("y", "a", "n", "p", "escape"):
+            if key in ("y", "s", "a", "n", "p", "escape"):
                 app._resolve_pending_permission("n" if key == "escape" else key)
                 event.stop()
                 event.prevent_default()
@@ -455,7 +458,7 @@ class EaccodeApp(App):
             "future": future,
             "tool_name": tool_name,
             "arguments": arguments,
-            "choices": {"y", "a", "n", "p"},
+            "choices": {"y", "s", "a", "n", "p"},
         }
         # B.4: register the ask so /approve <id> / /deny <id> can resolve
         # it while the modal is open (or after the fact).
@@ -526,7 +529,7 @@ class EaccodeApp(App):
             return None
 
     def _resolve_pending_permission(self, choice: str) -> None:
-        """Resolve the in-flight permission ask with *choice* (y/a/n/p)."""
+        """Resolve the in-flight permission ask with *choice* (y/s/a/n/p)."""
         from eaccode.permissions.prompts import PermissionChoice
 
         pending = getattr(self, "_pending_permission", None)
@@ -537,6 +540,7 @@ class EaccodeApp(App):
             return
         mapping = {
             "y": PermissionChoice.ALLOW_ONCE,
+            "s": PermissionChoice.ALLOW_SESSION,
             "a": PermissionChoice.ALLOW_ALWAYS,
             "n": PermissionChoice.DENY,
             "p": PermissionChoice.PAUSE,
@@ -584,7 +588,7 @@ class EaccodeApp(App):
         # Permission fallback (primary path: PermissionAwareInput).
         if not getattr(self, "_pending_permission", None):
             return
-        if key in ("y", "a", "n", "p", "escape"):
+        if key in ("y", "s", "a", "n", "p", "escape"):
             self._resolve_pending_permission("n" if key == "escape" else key)
             event.prevent_default()
             event.stop()

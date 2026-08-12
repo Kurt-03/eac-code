@@ -82,3 +82,23 @@ def test_inline_prompt_truncates_long_values():
     # Long values get truncated.
     assert "x" * 200 not in text
     assert "…" in text
+
+
+# ---------------------------------------------------------------------------
+# v0.0.1: ALLOW_SESSION quick-pick + visible legend
+# ---------------------------------------------------------------------------
+
+
+def test_inline_prompt_lists_all_keys_with_descriptions():
+    """v0.0.1: the legend shows y/s/a/n/p with descriptive labels."""
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt("bash", {"command": "ls"})
+    plain = render(text).plain
+    # All five keys and their descriptions must appear in the rendered text.
+    for key in ("[y]", "[s]", "[a]", "[n]", "[p]"):
+        assert key in plain, f"missing key {key} in prompt: {plain!r}"
+    for label in ("once", "session", "always", "deny", "pause"):
+        assert label in plain, f"missing label {label!r} in prompt: {plain!r}"
