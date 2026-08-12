@@ -11,6 +11,7 @@ from eaccode.config.providers import load_providers
 from eaccode.llm.client import CompletionRequest, LLMClient
 from eaccode.llm.models import Message
 
+
 def _has_live_provider() -> bool:
     try:
         providers = load_providers(EaccodePaths().providers_file)
