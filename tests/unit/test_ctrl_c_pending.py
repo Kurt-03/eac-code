@@ -1,16 +1,16 @@
 """P7/A.5: Ctrl+C during a pending permission prompt denies + cancels."""
 
-import asyncio
-from pathlib import Path
 
 
 async def test_ctrl_c_during_pending_denies_and_cancels(tmp_path):
     from textual.widgets import Input
 
-    from tests.unit.test_repl_permission_flow import (
-        _make_agent, _prepare_app, _start_turn, _wait_for,
-    )
     from eaccode.ui.repl import EaccodeApp
+    from tests.unit.test_repl_permission_flow import (
+        _make_agent,
+        _prepare_app,
+        _wait_for,
+    )
 
     app = EaccodeApp(workdir=tmp_path)
     agent, _client = _make_agent(tmp_path, app._ask_permission_async)

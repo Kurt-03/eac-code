@@ -41,7 +41,8 @@ def render_message(role: str, content: str, *,
 
 
 def render_permission_prompt(tool: str, args: dict,
-                             diff: str | None = None) -> str:
+                             diff: str | None = None,
+                             approval_id: int | None = None) -> str:
     """Inline permission question (Phase B). Flat text, no box.
 
     v0.0.1: the header carries a tool-specific subtitle (path + bytes,
@@ -49,12 +50,20 @@ def render_permission_prompt(tool: str, args: dict,
     lines are colored (red ``-``, green ``+``, cyan ``@@``, blue file
     headers) instead of being escaped plain. The legend is still escaped
     (``[y]``/``[a]`` would otherwise be eaten as style tags by Rich).
+
+    P7/B.4: ``approval_id`` is rendered as ``#<id>`` so the user can
+    target ``/approve <id>`` / ``/deny <id>`` even from outside the
+    REPL (headless bridge, after-the-fact decisions).
     """
     subtitle = _format_tool_subtitle(tool, args)
+    id_tag = f"  [dim]#{approval_id}[/dim]" if approval_id is not None else ""
     if subtitle:
-        header = f"‖  [bold]Allow {_escape(tool)}?[/bold]  [dim]{_escape(subtitle)}[/dim]"
+        header = (
+            f"‖  [bold]Allow {_escape(tool)}?[/bold]{id_tag}  "
+            f"[dim]{_escape(subtitle)}[/dim]"
+        )
     else:
-        header = f"‖  [bold]Allow {_escape(tool)}?[/bold]"
+        header = f"‖  [bold]Allow {_escape(tool)}?[/bold]{id_tag}"
     lines = [header]
     for key, value in _args_summary_dict(args).items():
         lines.append(f"‖   {_escape(key)}: {_escape(value)}")

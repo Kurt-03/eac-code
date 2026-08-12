@@ -1,6 +1,5 @@
 """P7/A.4: build_agent_async must thread paths.skills_dir into AgentConfig."""
 
-import asyncio
 from pathlib import Path
 
 import pytest

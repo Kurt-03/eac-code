@@ -332,6 +332,58 @@ class EaccodeApp(App):
         del self._input_history[:-50]  # cap
         self._history_idx = None
 
+    def _queue_prompt(self, text: str) -> None:
+        """P7/B.2: remember a user prompt and start a follow-up turn.
+
+        Called from on_input_submitted when the agent is already busy.
+        The next turn is launched by the current turn's done_callback
+        (or immediately if no turn is running). Permission prompts
+        skip the queue entirely (handled in on_input_submitted).
+        """
+        log = self.query_one("#transcript", RichLog)
+        queue = getattr(self, "_prompt_queue", None)
+        if queue is None:
+            self._prompt_queue: list[str] = []
+            queue = self._prompt_queue
+        queue.append(text)
+        log.write(
+            f"[dim]queued (N={len(queue)}) — type another or wait[/dim]"
+        )
+
+    def _drain_prompt_queue(self) -> None:
+        """Called from the turn's done_callback to launch queued prompts."""
+        queue = getattr(self, "_prompt_queue", [])
+        if not queue:
+            return
+        next_text = queue.pop(0)
+        log = self.query_one("#transcript", RichLog)
+        log.write(f"[dim]dequeued (N={len(queue)} left): {next_text!r}[/dim]")
+        self.messages.append({"role": "user", "content": next_text})
+        self._last_prompt = next_text
+        self._remember_prompt(next_text)
+        self._busy = True
+        import asyncio
+
+        task = asyncio.create_task(self._run_agent_streaming(log))
+
+        def _on_turn_done(task: asyncio.Task) -> None:
+            try:
+                task.result()
+            except asyncio.CancelledError:
+                log.write("[yellow]⏹ run cancelled[/yellow]")
+            except Exception as e:
+                from eaccode.ui.messages import write_error
+
+                log.write(write_error(f"Agent loop crashed: {e}"))
+            finally:
+                self._busy = False
+                self._current_task = None
+                self._drain_prompt_queue()
+
+        task.add_done_callback(_on_turn_done)
+        self._current_task = task
+        self._history_idx = None
+
     def _history_navigate(self, delta: int) -> None:
         """Move through the prompt history; up/down (I2)."""
         if not self._input_history:
@@ -394,11 +446,6 @@ class EaccodeApp(App):
             log.write(write_warn(self._error))
             return
 
-        if self._busy:
-            log.write("[dim]still working — wait for the turn to finish, "
-                      "or press Ctrl+C[/dim]")
-            return
-
         # G9 (audit): if the agent build failed at startup, say so
         # instead of letting run_streaming crash on None.
         if self._agent is None:
@@ -406,6 +453,15 @@ class EaccodeApp(App):
 
             log.write(write_error("Agent not ready — check provider "
                                   "setup (eaccode doctor)"))
+            return
+
+        # P7/B.2: while a turn is running we do NOT throw the prompt
+        # away. Queue it; the running turn's done callback drains the
+        # queue and starts the next one. The composer is never locked
+        # (per the plan's "Input IMMER live" rule). Permission prompts
+        # during the running turn stay in the foreground.
+        if self._busy:
+            self._queue_prompt(text)
             return
 
         self.messages.append({"role": "user", "content": text})
@@ -436,6 +492,8 @@ class EaccodeApp(App):
             finally:
                 self._busy = False
                 self._current_task = None
+                # P7/B.2: drain any prompts queued during this turn.
+                self._drain_prompt_queue()
 
         self._current_task.add_done_callback(_on_turn_done)
 
@@ -453,11 +511,18 @@ class EaccodeApp(App):
         from eaccode.tui.render import render_permission_prompt
 
         future: asyncio.Future = asyncio.get_running_loop().create_future()
+        # P7/B.4: register BEFORE rendering so the prompt header
+        # carries the #id and /approve <id> works on the live ask.
+        approval_id = self._approvals.register(
+            tool_name, arguments, question, future,
+        )
         display_args = display_arguments(tool_name, arguments, self.workdir)
         log = self.query_one("#transcript", RichLog)
         # Diff preview for write/edit (best-effort).
         diff = self._diff_preview(tool_name, display_args)
-        prompt_text = render_permission_prompt(tool_name, display_args, diff)
+        prompt_text = render_permission_prompt(
+            tool_name, display_args, diff, approval_id=approval_id,
+        )
         log.write(prompt_text)
         # v0.4.0.3: the PermissionAwareInput subclass intercepts y/a/n/p/Esc
         # while a permission is pending — no runtime bindings needed.
