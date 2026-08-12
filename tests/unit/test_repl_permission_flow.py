@@ -164,7 +164,7 @@ async def test_permission_timeout_logs_denial_and_restores_input(tmp_path):
     from eaccode.ui.repl import EaccodeApp
 
     app = EaccodeApp(workdir=tmp_path)
-    agent, _client = _make_agent(tmp_path, app._ask_permission_async)
+    agent, client = _make_agent(tmp_path, app._ask_permission_async)
     await _prepare_app(tmp_path, agent, app)
 
     async with app.run_test() as pilot:
@@ -262,7 +262,7 @@ async def test_permission_escape_denies(tmp_path):
     from eaccode.ui.repl import EaccodeApp
 
     app = EaccodeApp(workdir=tmp_path)
-    agent, _client = _make_agent(tmp_path, app._ask_permission_async)
+    agent, client = _make_agent(tmp_path, app._ask_permission_async)
     await _prepare_app(tmp_path, agent, app)
 
     async with app.run_test() as pilot:
