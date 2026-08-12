@@ -33,7 +33,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 # A marker that we still need to close may be split across deltas.
 # We buffer the *trailing* substring only if it could be the start of
 # an open marker (``**``, ``*``, `` ` ``, or `` ``` ``).

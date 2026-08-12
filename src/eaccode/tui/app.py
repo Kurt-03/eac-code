@@ -90,14 +90,6 @@ class EaccodeApp(App):
         padding: 0 1 0 1;
         color: $text-muted;
     }
-    #stream {
-        height: auto;
-        max-height: 30;
-        border: none;
-        padding: 0 1 0 1;
-        color: $text;
-        background: $background;
-    }
     #prompt-glyph {
         width: 2;
         padding: 0 0 0 1;
@@ -203,10 +195,9 @@ class EaccodeApp(App):
             yield RichLog(id="transcript", wrap=True, markup=True,
                           highlight=False)
             yield Static(id="overlay")
-            # B1/B2 (audit): live stream text renders in its own Static
-            # (replaced on every delta) and lands in the Log only once
-            # when the turn finishes — no staircase duplication.
-            yield Static(id="stream")
+            # v0.0.1: the live stream renders IN the transcript via
+            # StreamingMarkdownRenderer (no separate static widget,
+            # no full re-parse). The Log owns the visual canvas.
             with Horizontal(id="composer-row"):
                 yield Static(self.skin.brand.prompt, id="prompt-glyph")
                 # I5 (audit): no inline ghost suggester — the fuzzy
@@ -680,19 +671,18 @@ class EaccodeApp(App):
                 return  # stale stream — a newer turn owns the UI
             _hide_spinner()
             self._stream_text += delta
-            # B1 (audit): update the live stream Static instead of
-            # appending the whole accumulated text to the Log again.
-            from contextlib import suppress
+            # v0.0.1: stream renders IN the transcript via the incremental
+            # StreamingMarkdownRenderer (no full re-parse, no separate
+            # static widget). The markdown fragment is written to the
+            # RichLog directly and replaces the visible "live" line on
+            # the next scroll.
+            from eaccode.tui.streaming_md import StreamingMarkdownRenderer
 
-            from eaccode.tui.markdown import render_markdown
-
-
-            with suppress(Exception):
-
-
-                self.query_one("#stream", Static).update(
-                                    render_markdown(self._stream_text)
-                                )
+            if not hasattr(self, "_stream_renderer"):
+                self._stream_renderer = StreamingMarkdownRenderer()
+            fragment = self._stream_renderer.feed(delta)
+            if fragment:
+                log.write(fragment)
 
         def on_reasoning_delta(delta: str) -> None:
             """Accumulate reasoning; render collapsed above the answer (B.3).
@@ -706,29 +696,24 @@ class EaccodeApp(App):
             self._reasoning_text += delta
             if not self._show_reasoning:
                 return  # collapsed: don't paint, just accumulate
-            # B10 (audit): reasoning renders into the stream Static too
-            # (replaced, not appended) — no duplication, no Log spam.
-            from eaccode.tui.markdown import render_markdown
+            # v0.0.1: reasoning renders into the transcript directly.
+            from rich.markup import escape as esc
 
             capped = self._reasoning_text[:2000]
             suffix = "…" if len(self._reasoning_text) > 2000 else ""
-            from contextlib import suppress
-
-            with suppress(Exception):
-
-                self.query_one("#stream", Static).update(
-                                    f"[dim italic]{capped}{suffix}[/dim italic]\n"
-                                    f"{render_markdown(self._stream_text)}"
-                                )
+            log.write(f"[dim italic]🧠 {esc(capped)}{esc(suffix)}[/dim italic]")
 
         def on_tool_call(tc: ToolCall) -> None:
             _hide_spinner()
             self._stream_text = ""
-            from contextlib import suppress
-
-            with suppress(Exception):
-
-                self.query_one("#stream", Static).update("")
+            # v0.0.1: flush any pending streaming fragment, then reset the
+            # renderer so the next stream starts clean.
+            fragment = ""
+            renderer = getattr(self, "_stream_renderer", None)
+            if renderer is not None:
+                fragment = renderer.finalize()
+            if fragment:
+                log.write(fragment)
             import time
 
             self._tool_starts[tc.id] = time.monotonic()
@@ -797,11 +782,6 @@ class EaccodeApp(App):
         # B2 (audit): the final answer lands in the Log exactly once;
         # the stream Static is cleared so it does not duplicate.
         log.write(f"[magenta]⚡[/magenta] {render_markdown(result.final_text)}")
-        from contextlib import suppress
-
-        with suppress(Exception):
-
-            self.query_one("#stream", Static).update("")
         self.messages.append({"role": "assistant", "content": result.final_text})
         # C.1: background review when the turn window is reached.
         if self._review_scheduler.should_review(result.turns):
