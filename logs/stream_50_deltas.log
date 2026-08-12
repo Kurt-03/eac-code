@@ -1,0 +1,23 @@
+v0.0.1 — 50-delta streaming reproducer
+========================================
+deltas:                   50
+transcript fragments:     47
+max renderer feed size:   4
+max fragment size:        21
+avg renderer feed size:   4.0
+final renderer state:     clean
+
+per-delta timings (first 10):
+  [ 0] t=0.034s  feed=  4  fragment=  4
+  [ 1] t=0.034s  feed=  4  fragment=  2
+  [ 2] t=0.034s  feed=  4  fragment=  0
+  [ 3] t=0.034s  feed=  4  fragment= 19
+  [ 4] t=0.034s  feed=  4  fragment=  4
+  [ 5] t=0.034s  feed=  4  fragment=  4
+  [ 6] t=0.034s  feed=  4  fragment=  4
+  [ 7] t=0.034s  feed=  4  fragment=  4
+  [ 8] t=0.034s  feed=  4  fragment=  4
+  [ 9] t=0.034s  feed=  4  fragment=  4
+
+transcript content (first 600 chars):
+Hello [bold]world[/bold] — this is a synthetic stream of text used to verify Hermes-style in-place updates. Each call appends a bit more content; the UI must render without full re-parse.Hello [bold]world[/bold] — this
