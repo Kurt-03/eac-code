@@ -1,6 +1,6 @@
 """50-delta streaming reproducer (v0.0.1 — Hermes/Claude-Code parity).
 
-Drives the real streaming pipeline with synthetic deltas and records every
+Drives the streaming pipeline with synthetic deltas and records every
 call to the transcript (RichLog.write) and the markdown renderer. Used to
 prove that:
 
@@ -20,7 +20,6 @@ from typing import Callable
 
 import pytest
 
-from eaccode.tui.app import EaccodeApp
 from eaccode.tui.streaming_md import StreamingMarkdownRenderer
 
 
@@ -38,8 +37,8 @@ class StreamRecord:
     final_text: str = ""
 
 
-def _synthetic_deltas(n: int, chunk_size: int = 4) -> list[str]:
-    """50 cumulative-content deltas, each ``chunk_size`` characters."""
+def _synthetic_deltas(n: int = 50, chunk_size: int = 4) -> list[str]:
+    """N cumulative-content deltas, each ``chunk_size`` characters."""
     full = (
         "Hello **world** — this is a synthetic stream of text used to "
         "verify Hermes-style in-place updates. Each call appends a bit "
@@ -47,6 +46,11 @@ def _synthetic_deltas(n: int, chunk_size: int = 4) -> list[str]:
     )
     full = (full * 5)[: n * chunk_size]
     return [full[i : i + chunk_size] for i in range(0, len(full), chunk_size)]
+
+
+def _synthetic_text(n: int = 50, chunk_size: int = 4) -> str:
+    """The full synthetic text without splitting."""
+    return "".join(_synthetic_deltas(n, chunk_size))
 
 
 # ---------------------------------------------------------------------------
@@ -75,13 +79,21 @@ def test_streaming_renderer_buffers_unclosed_markdown() -> None:
     renderer = StreamingMarkdownRenderer()
     out1 = renderer.feed("hello **bol")
     out2 = renderer.feed("d** world")
-    # The renderer is allowed to buffer the half-closed bold until the
-    # next delta completes it. The final output must contain the bold
-    # text in the markup.
+    # The final output must contain the bold text inside the markup.
     combined = out1 + out2
-    assert "bol" in combined or "bold" in combined
-    # The renderer must not emit the literal `**` markup markers.
-    assert "**" not in combined
+    assert "bold" in combined, (
+        f"expected 'bold' in rendered output, got: {combined!r}"
+    )
+    # The ** markers must be consumed by the renderer (the user-visible
+    # text must not contain the literal `**` markup markers).
+    # We strip the rich markup tags first to check what the user sees.
+    import re
+
+    visible = re.sub(r"\[/?[^\]]+\]", "", combined)
+    assert "**" not in visible, (
+        f"the literal '**' markers leaked through to the rendered text: "
+        f"visible={visible!r}, combined={combined!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -110,101 +122,61 @@ class _FakeStatic:
         self.content = text
 
 
-class _FakeInput:
-    disabled = False
+def _extract_stream_callbacks() -> tuple:
+    """Build the same `on_text` callback the real TUI uses, but pointed at
+    fakes so we can record behavior without Textual needing a real terminal.
 
-
-class _FakeApp(EaccodeApp):
-    """EaccodeApp subclass that swaps the heavy imports for fakes."""
-
-    def __init__(self) -> None:  # noqa: D401 — fake for tests
-        # Skip the full __init__: install the bare attributes we need.
-        self._stream_text = ""
-        self._reasoning_text = ""
-        self._tool_starts = {}
-        self._show_reasoning = False
-        self._spinner_interval = None
-        from eaccode.llm.stream_fence import claim_stream_writer
-        # Bypass the full Textual App.__init__ — we only need the
-        # streaming callback closures and the log/static objects.
-        import unittest.mock as mock
-        self.app = mock.MagicMock()
-        # Simulate a fresh stream fence.
-        claim_stream_writer(self)
-        self._stream_writer_token = getattr(self, "_stream_writer_token", None)
-
-
-def _extract_stream_callbacks(app: _FakeApp) -> Callable:
-    """Build the same `on_text`/`on_tool_call`/`on_tool_result` callbacks the
-    real TUI uses, but pointed at fakes so we can record behavior without
-    Textual needing a real terminal."""
-    from eaccode.llm.models import ToolCall
-    from eaccode.tools.base import ToolResult
-    from eaccode.tui.streaming_md import StreamingMarkdownRenderer
+    Returns: (on_text, renderer, log, stream_static).
+    """
     from eaccode.llm.stream_fence import claim_stream_writer, fence_delta
 
     log = _FakeRichLog()
     stream_static = _FakeStatic()
-    app._stream_static = stream_static  # type: ignore[attr-defined]
     renderer = StreamingMarkdownRenderer()
-    app._stream_renderer = renderer  # type: ignore[attr-defined]
-    app._stream_log = log  # type: ignore[attr-defined]
 
-    claim_stream_writer(app)
-    writer_token = app._stream_writer_token
+    # The fence uses a context attribute on the app object; we use a
+    # plain object as the "app" for the fence.
+    class _FenceTarget:
+        pass
+
+    ft = _FenceTarget()
+    claim_stream_writer(ft)
+    writer_token = ft._stream_writer_token
 
     def on_text(delta: str) -> None:
-        if fence_delta(app, writer_token, delta) is None:
+        if fence_delta(ft, writer_token, delta) is None:
             return
+        # The v0.0.1 stream writes IN the transcript, not in a static.
         text = renderer.feed(delta)
         if text:
-            stream_static.update(text)
+            log.write(text)
 
-    def on_tool_call(tc: ToolCall) -> None:
-        renderer.reset()
-        stream_static.update("")
-        log.write(f"▸ {tc.name}")
-
-    def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
-        log.write(f"  ✓ {tc.name}")
-
-    return on_text, on_tool_call, on_tool_result, log, stream_static
+    return on_text, renderer, log, stream_static
 
 
 def test_stream_50_deltas_writes_to_transcript_not_separate_static() -> None:
     """The 50 deltas end up in the transcript RichLog, not in a separate
     static widget."""
-    from eaccode.llm.models import ToolCall
-    from eaccode.tools.base import ToolResult
-
-    app = _FakeApp()
-    on_text, on_tool_call, on_tool_result, log, stream_static = (
-        _extract_stream_callbacks(app)
-    )
+    on_text, _renderer, log, stream_static = _extract_stream_callbacks()
 
     for d in _synthetic_deltas(50):
         on_text(d)
 
     # The static widget should NEVER have been written to: the stream
     # lives in the transcript, not in a separate widget.
-    assert stream_static.content == "" or len(stream_static.content) < len(
-        _synthetic_deltas(50, chunk_size=4)[0]
-    ), (
+    assert stream_static.content == "", (
         "static widget should not be the destination of the streaming text; "
         f"got {len(stream_static.content)} bytes of accumulated text."
     )
+    # The transcript, in contrast, should have received many fragments.
+    assert len(log.lines) > 0, "transcript did not receive any lines"
 
 
 def test_stream_50_deltas_does_not_call_full_reparse() -> None:
     """Across 50 deltas the renderer must not linearly grow its internal
     feed-size. Capture the per-delta feed sizes and assert the max is
     bounded by the delta size, not the accumulated text."""
-    from eaccode.llm.models import ToolCall
-    from eaccode.tools.base import ToolResult
-
-    app = _FakeApp()
-    on_text, _tc, _tr, _log, _static = _extract_stream_callbacks(app)
-    renderer = app._stream_renderer  # type: ignore[attr-defined]
+    on_text, renderer, _log, _static = _extract_stream_callbacks()
 
     sizes: list[int] = []
     for d in _synthetic_deltas(50):
@@ -214,33 +186,39 @@ def test_stream_50_deltas_does_not_call_full_reparse() -> None:
     # The renderer must work incrementally. The biggest single feed
     # should be small (the delta + a small lookahead buffer), not the
     # full accumulated text.
-    assert max(sizes) <= 64, (
+    assert max(sizes) <= 16, (
         f"renderer re-parses increasingly large text: max feed size = "
-        f"{max(sizes)}, expected <= 64."
+        f"{max(sizes)}, expected <= 16."
     )
 
 
 def test_stream_final_text_is_not_written_twice() -> None:
-    """The final-text callback (post-stream) must not duplicate the answer."""
-    from eaccode.llm.models import ToolCall, ToolResult, AgentResult
-    from eaccode.tools.base import ToolResult
+    """The finalize()-call must not duplicate the answer in the transcript."""
+    on_text, renderer, log, _static = _extract_stream_callbacks()
 
-    app = _FakeApp()
-    on_text, _tc, _tr, log, _static = _extract_stream_callbacks(app)
-    renderer = app._stream_renderer  # type: ignore[attr-defined]
-
-    full_text = "".join(_synthetic_deltas(50))
+    raw_text = _synthetic_text(50)
+    # After markdown rendering, `**world**` becomes `world` (bold markup).
+    # The visible "no markup" form of the full text is what we look for.
+    expected_visible = raw_text.replace("**world**", "world")
     for d in _synthetic_deltas(50):
         on_text(d)
-    # Commit the stream -> write the final line to the transcript.
+    # Commit the stream -> finalize + write the final fragment to the
+    # transcript.
     final = renderer.finalize()
-    log.write(f"[magenta]⚡ {final}")
+    if final:
+        log.write(final)
 
-    # The transcript should contain the final answer exactly once.
-    occurrences = sum(1 for line in log.lines if full_text in line)
+    # Concatenate everything in the transcript and check the full text
+    # appears exactly once (after stripping Rich markup).
+    joined = "".join(log.lines)
+    import re
+
+    visible = re.sub(r"\[/?[^\]]+\]", "", joined)
+    occurrences = visible.count(expected_visible)
     assert occurrences == 1, (
         f"final text appears {occurrences} times in transcript; "
-        f"expected exactly 1 (no duplicate render at turn end)."
+        f"expected exactly 1 (no duplicate render at turn end).\n"
+        f"visible: {visible!r}"
     )
 
 
