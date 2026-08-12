@@ -24,15 +24,21 @@ def test_safe_url_blocks_non_http():
 # ------------------------------------------------------------ H.20/H.22
 
 
-def test_protected_credential_files(tmp_path):
+def test_protected_credential_files(tmp_path, monkeypatch):
     """E7 (audit): credential files are only protected under eaccode's
-    own config dir — a project's .env is legitimate agent input."""
-    from eaccode.config.paths import EaccodePaths
+    own config dir — a project's .env is legitimate agent input.
 
-    config_dir = EaccodePaths().config_dir
-    config_dir.mkdir(parents=True, exist_ok=True)
+    CRITICAL: EaccodePaths is mocked — the old version wrote into the
+    real %LOCALAPPDATA%/eaccode and destroyed the user's providers.yaml
+    and .env (August 2026 incident)."""
+    from eaccode.config import paths as paths_mod
+
+    class _FakePaths:
+        config_dir = tmp_path
+
+    monkeypatch.setattr(paths_mod, "EaccodePaths", lambda: _FakePaths())
     for name in (".env", "providers.yaml", "allowlist.json"):
-        f = config_dir / name
+        f = tmp_path / name
         f.write_text("x")
         assert is_protected_path(f) is True
 

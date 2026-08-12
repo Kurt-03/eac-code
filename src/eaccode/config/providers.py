@@ -92,14 +92,23 @@ def save_providers(providers: list[ProviderConfig], path: Path) -> None:
 def load_providers(path: Path) -> list[ProviderConfig]:
     if not path.exists():
         return []
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or []
-    return [
-        ProviderConfig(
-            name=p["name"],
-            api_key=p["api_key"],
-            model=p["model"],
-            base_url=p.get("base_url"),
-            extra=p.get("extra", {}),
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or []
+    except Exception:
+        return []  # corrupt file: fail open, the CLI surfaces the gap
+    if not isinstance(raw, list):
+        return []  # e.g. a bare string — not a provider list
+    out: list[ProviderConfig] = []
+    for p in raw:
+        if not isinstance(p, dict):
+            continue  # skip junk entries instead of crashing
+        out.append(
+            ProviderConfig(
+                name=p["name"],
+                api_key=p["api_key"],
+                model=p["model"],
+                base_url=p.get("base_url"),
+                extra=p.get("extra", {}),
+            )
         )
-        for p in raw
-    ]
+    return out
