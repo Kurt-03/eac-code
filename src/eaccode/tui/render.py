@@ -44,12 +44,18 @@ def render_permission_prompt(tool: str, args: dict,
                              diff: str | None = None) -> str:
     """Inline permission question (Phase B). Flat text, no box.
 
-    v0.0.1: the diff lines are colored (red ``-``, green ``+``, cyan
-    ``@@``, blue file headers) instead of being escaped plain. The
-    toolkit arguments and the legend are still escaped (``[y]``/``[a]``
-    etc. would otherwise be eaten as style tags by Rich — v0.5.3 bug).
+    v0.0.1: the header carries a tool-specific subtitle (path + bytes,
+    command, replace hint) next to the "Allow <tool>?" call. The diff
+    lines are colored (red ``-``, green ``+``, cyan ``@@``, blue file
+    headers) instead of being escaped plain. The legend is still escaped
+    (``[y]``/``[a]`` would otherwise be eaten as style tags by Rich).
     """
-    lines = [f"‖ Allow {_escape(tool)}?"]
+    subtitle = _format_tool_subtitle(tool, args)
+    if subtitle:
+        header = f"‖  [bold]Allow {_escape(tool)}?[/bold]  [dim]{_escape(subtitle)}[/dim]"
+    else:
+        header = f"‖  [bold]Allow {_escape(tool)}?[/bold]"
+    lines = [header]
     for key, value in _args_summary_dict(args).items():
         lines.append(f"‖   {_escape(key)}: {_escape(value)}")
     if diff:
@@ -61,6 +67,42 @@ def render_permission_prompt(tool: str, args: dict,
                          "[n] deny    [p] pause    [Esc] deny")
     )
     return "\n".join(lines)
+
+
+def _format_tool_subtitle(tool: str, args: dict) -> str:
+    """One-line summary of the tool call, shown in the prompt header.
+
+    - bash     → "command: <cmd>"
+    - read     → "path"
+    - write    → "path · N bytes"
+    - edit     → "path · replace 'old' → 'new'"
+    - everything else → first non-empty argument value
+    """
+    if tool == "bash":
+        cmd = args.get("command", "")
+        return f"{cmd}" if cmd else ""
+    if tool == "read":
+        path = args.get("path", "")
+        return f"{path}" if path else ""
+    if tool == "write":
+        path = args.get("path", "")
+        content = args.get("content", "")
+        size = len(content) if isinstance(content, str) else 0
+        if path and content:
+            return f"{path} · {size} bytes"
+        return f"{path}" if path else ""
+    if tool == "edit":
+        path = args.get("path", "")
+        old = args.get("old_string", "")
+        new = args.get("new_string", "")
+        if path and old and new:
+            return f"{path} · replace '{old}' → '{new}'"
+        return f"{path}" if path else ""
+    # Fallback: first non-empty value
+    for v in args.values():
+        if v not in (None, "", [], {}):
+            return str(v)[:80]
+    return ""
 
 
 def _render_diff_line(line: str) -> str:

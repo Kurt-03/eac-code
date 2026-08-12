@@ -142,3 +142,54 @@ def test_diff_render_preserves_visible_text():
     assert "+++ b/x.py" in plain
     assert "-old" in plain
     assert "+new" in plain
+
+
+# ---------------------------------------------------------------------------
+# v0.0.1: header carries a tool-specific subtitle (path · bytes, command, …)
+# ---------------------------------------------------------------------------
+
+
+def test_header_for_write_shows_path_and_bytes():
+    """The write prompt header shows the path and the byte count."""
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt(
+        "write", {"path": "src/foo.py", "content": "hello world"}
+    )
+    plain = render(text).plain
+    assert "Allow write?" in plain
+    assert "src/foo.py" in plain
+    assert "11 bytes" in plain  # "hello world" is 11 bytes
+
+
+def test_header_for_edit_shows_path_and_replace_hint():
+    """The edit prompt header shows the path and a replace hint."""
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt(
+        "edit",
+        {"path": "src/foo.py", "old_string": "foo", "new_string": "bar"},
+    )
+    plain = render(text).plain
+    assert "Allow edit?" in plain
+    assert "src/foo.py" in plain
+    assert "replace" in plain
+    assert "'foo'" in plain
+
+
+def test_header_for_bash_shows_command():
+    """The bash prompt header shows the command."""
+    from rich.markup import render
+
+    from eaccode.tui.render import render_permission_prompt
+
+    text = render_permission_prompt(
+        "bash", {"command": "git status --short"}
+    )
+    plain = render(text).plain
+    assert "Allow bash?" in plain
+    assert "git status --short" in plain
