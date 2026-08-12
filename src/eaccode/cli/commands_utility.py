@@ -69,7 +69,8 @@ def doctor() -> None:
     hooks = paths.hooks_dir
     from eaccode.hooks.registry import discover_hooks
 
-    hook_count = sum(len(v) for v in discover_hooks(hooks).values())
+    # A4 (audit): discover_hooks returns list[Path], not a dict.
+    hook_count = len(discover_hooks(hooks))
     check(hook_count >= 0, f"hooks dir ({hook_count} script(s))")
     for p in providers:
         has_key = bool(p.api_key)
@@ -138,14 +139,14 @@ def skills_add(path: str) -> None:
     """Import a skill markdown file into the skills directory."""
     import shutil
 
-    from eaccode.memory.skills import _parse_frontmatter
+    from eaccode.memory.skills import parse_skill_frontmatter
 
     paths = EaccodePaths()
     src = Path(path)
     if not src.exists():
         print_error(f"✗ File not found: {src}")
         raise SystemExit(1)
-    meta, _ = _parse_frontmatter(src.read_text(encoding="utf-8"))
+    meta, _ = parse_skill_frontmatter(src.read_text(encoding="utf-8"))
     name = meta.get("name") or src.stem
     paths.skills_dir.mkdir(parents=True, exist_ok=True)
     dest = paths.skills_dir / f"{name}.md"

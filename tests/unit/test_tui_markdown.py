@@ -54,3 +54,37 @@ def test_mixed_content():
     assert "Text" in out
     assert "code" in out
     assert "mehr" in out
+
+
+def test_brackets_survive_rendering():
+    """B3 (audit): model text with brackets must not be eaten."""
+    from rich.markup import render
+
+    out = render_markdown("use arr[i] and [info] tags")
+    plain = render(out).plain
+    assert "arr[i]" in plain
+    assert "[info]" in plain
+
+
+def test_link_renders_label_only():
+    """B4 (audit): links must not collapse to empty parens."""
+    out = render_markdown("see [docs](https://example.com) now")
+    assert "[docs]" in out
+    assert "example.com" not in out
+
+
+def test_open_fence_renders_as_code():
+    """B7 (audit): unclosed fences (streaming) render as code, not prose."""
+    out = render_markdown("start\n```py\nprint(1)")
+    assert "print(1)" in out
+    assert "py" in out  # language tag
+
+
+def test_code_block_language_tag():
+    out = render_markdown("```python\nx = 1\n```")
+    assert "python" in out
+
+
+def test_inline_code_has_own_color():
+    out = render_markdown("run `pytest`")
+    assert "#dca050" in out

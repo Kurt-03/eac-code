@@ -75,6 +75,14 @@ class EaccodeApp(App):
         padding: 0 1 0 1;
         color: $text-muted;
     }
+    #stream {
+        height: auto;
+        max-height: 30;
+        border: none;
+        padding: 0 1 0 1;
+        color: $text;
+        background: $background;
+    }
     #prompt-glyph {
         width: 2;
         padding: 0 0 0 1;
@@ -178,6 +186,10 @@ class EaccodeApp(App):
             yield RichLog(id="transcript", wrap=True, markup=True,
                           highlight=False)
             yield Static(id="overlay")
+            # B1/B2 (audit): live stream text renders in its own Static
+            # (replaced on every delta) and lands in the Log only once
+            # when the turn finishes — no staircase duplication.
+            yield Static(id="stream")
             with Horizontal(id="composer-row"):
                 yield Static(self.skin.brand.prompt, id="prompt-glyph")
                 yield PermissionAwareInput(
@@ -227,6 +239,13 @@ class EaccodeApp(App):
             log.write(write_warn(str(e)))
             return
         self._agent = agent
+        # B9 (audit): the status rule showed '—' because the model name
+        # was never read off the built agent.
+        client_model = getattr(getattr(agent, "client", None),
+                               "default_model", None)
+        if client_model:
+            self._model_name = client_model
+        self._refresh_status_rule()
         # A.9: memory nudge renders into the log.
         if agent.config.memory_nudge_every_turns > 0:
             agent.config.on_nudge = lambda msg: log.write(f"[dim]{msg}[/dim]")
@@ -293,10 +312,20 @@ class EaccodeApp(App):
             return
         event.input.value = ""
         # v0.5.0: Hermes-style user line — prompt glyph in the gutter.
-        log.write(f"[bold cyan]❯[/bold cyan] {text}\n")
+        # B3 (audit): escape user text — brackets must survive markup.
+        from rich.markup import escape as _esc
+
+        log.write(f"[bold cyan]❯[/bold cyan] {_esc(text)}\n")
 
         if text.startswith("/"):
-            result = handle_command(text, self)
+            # A2 (audit): a failing slash command must never take down
+            # the whole TUI — log a red line instead.
+            try:
+                result = handle_command(text, self)
+            except Exception as e:
+                from eaccode.ui.commands import CommandResult
+
+                result = CommandResult(message=f"✗ command error: {e}")
             if result.message:
                 log.write(result.message)
             if result.should_exit:
@@ -585,14 +614,19 @@ class EaccodeApp(App):
                 return  # stale stream — a newer turn owns the UI
             _hide_spinner()
             self._stream_text += delta
-            # v0.5.0: assistant text renders with the tool glyph gutter
-            # (Hermes-style) and live markdown.
+            # B1 (audit): update the live stream Static instead of
+            # appending the whole accumulated text to the Log again.
+            from contextlib import suppress
+
             from eaccode.tui.markdown import render_markdown
 
-            rendered = render_markdown(self._stream_text)
-            self.query_one("#transcript", RichLog).write(
-                f"[magenta]⚡[/magenta] {rendered}"
-            )
+
+            with suppress(Exception):
+
+
+                self.query_one("#stream", Static).update(
+                                    render_markdown(self._stream_text)
+                                )
 
         def on_reasoning_delta(delta: str) -> None:
             """Accumulate reasoning; render collapsed above the answer (B.3).
@@ -606,16 +640,29 @@ class EaccodeApp(App):
             self._reasoning_text += delta
             if not self._show_reasoning:
                 return  # collapsed: don't paint, just accumulate
+            # B10 (audit): reasoning renders into the stream Static too
+            # (replaced, not appended) — no duplication, no Log spam.
+            from eaccode.tui.markdown import render_markdown
+
             capped = self._reasoning_text[:2000]
             suffix = "…" if len(self._reasoning_text) > 2000 else ""
-            self.query_one("#transcript", RichLog).write(
-                f"[dim italic]{capped}{suffix}[/dim italic]\n"
-                f"[dim]{self._stream_text}[/dim]"
-            )
+            from contextlib import suppress
+
+            with suppress(Exception):
+
+                self.query_one("#stream", Static).update(
+                                    f"[dim italic]{capped}{suffix}[/dim italic]\n"
+                                    f"{render_markdown(self._stream_text)}"
+                                )
 
         def on_tool_call(tc: ToolCall) -> None:
             _hide_spinner()
             self._stream_text = ""
+            from contextlib import suppress
+
+            with suppress(Exception):
+
+                self.query_one("#stream", Static).update("")
             import time
 
             self._tool_starts[tc.id] = time.monotonic()
@@ -624,16 +671,24 @@ class EaccodeApp(App):
                 # of the raw call expression when a verb is known.
                 label = build_tool_label(tc.name, tc.arguments)
                 if label:
-                    log.write(f"[dim]{CHEVRON} {label}[/dim]")
+                    # B3 (audit): escape everything that came from the
+                    # model/tool before it hits the markup-enabled Log.
+                    from rich.markup import escape as esc
+
+                    log.write(f"[dim]{CHEVRON} {esc(label)}[/dim]")
                 else:
                     card = build_call_card(
                         tc.name, tc.arguments,
                         full_args=VerboseLevel.show_full_args(self.verbose_level),
                     )
-                    log.write(f"[dim]{CHEVRON} {card.call}[/dim]")
+                    from rich.markup import escape as esc
+
+                    log.write(f"[dim]{CHEVRON} {esc(card.call)}[/dim]")
 
         def on_tool_result(tc: ToolCall, result: ToolResult) -> None:
             import time
+
+            from rich.markup import escape as esc
 
             duration = None
             start = self._tool_starts.pop(tc.id, None)
@@ -650,14 +705,14 @@ class EaccodeApp(App):
             mark = "✗" if result.is_error else "✓"
             style = "red" if result.is_error else "green"
             duration_txt = f" · {duration:.1f}s" if duration is not None else ""
-            preview_txt = f" {card.result_preview}" if card.result_preview else ""
-            log.write(f"  [{style}]{mark}[/{style}] {card.name}{duration_txt}{preview_txt}")
+            preview_txt = f" {esc(card.result_preview)}" if card.result_preview else ""
+            log.write(f"  [{style}]{mark}[/{style}] {esc(card.name)}{duration_txt}{preview_txt}")
             # Phase B.7: multi-line result preview with collapse.
             if card.result_lines and self.verbose_level in (
                 VerboseLevel.ALL, VerboseLevel.VERBOSE,
             ):
                 for line in card.result_lines:
-                    log.write(f"    [dim]{line}[/dim]")
+                    log.write(f"    [dim]{esc(line)}[/dim]")
                 if card.collapsed:
                     log.write(f"    [dim]… ({card.more_lines} more lines — "
                               f"/verbose verbose to expand)[/dim]")
@@ -673,7 +728,14 @@ class EaccodeApp(App):
         self._last_answer = result.final_text
         from eaccode.tui.markdown import render_markdown
 
+        # B2 (audit): the final answer lands in the Log exactly once;
+        # the stream Static is cleared so it does not duplicate.
         log.write(f"[magenta]⚡[/magenta] {render_markdown(result.final_text)}")
+        from contextlib import suppress
+
+        with suppress(Exception):
+
+            self.query_one("#stream", Static).update("")
         self.messages.append({"role": "assistant", "content": result.final_text})
         # C.1: background review when the turn window is reached.
         if self._review_scheduler.should_review(result.turns):
@@ -880,19 +942,28 @@ class EaccodeApp(App):
         if verb is not None:
             self._status_verb = verb
         ctx_used = None
-        try:
-            usage = self._agent.usage if self._agent is not None else None
-            if usage is not None:
-                ctx_used = usage.input_tokens + usage.output_tokens
-        except Exception:
-            pass
+        ctx_max = None
+        if self.messages:
+            try:
+                # B8 (audit): real context numbers — the bar was dead
+                # because context_max was hard-wired to None.
+                from eaccode.llm.tokens import (
+                    count_message_tokens,
+                    model_context_window,
+                )
+
+                model = self._model_name or "default"
+                ctx_max = model_context_window(model)
+                ctx_used = count_message_tokens(self.messages, model)
+            except Exception:
+                pass
         rule = StatusRule(
             busy=getattr(self, "_status_busy", False),
             indicator=getattr(self, "_status_indicator", ""),
             verb=getattr(self, "_status_verb", ""),
             model=self._model_name or "—",
             context_used=ctx_used,
-            context_max=None,
+            context_max=ctx_max,
             cost_usd=self._total_usage.cost_usd,
             right_label=self._session_title or str(self.workdir),
         )
@@ -907,7 +978,12 @@ class EaccodeApp(App):
 
         def run(name: str) -> None:
             log = self.query_one("#transcript", RichLog)
-            result = handle_command(name, self)
+            try:
+                result = handle_command(name, self)
+            except Exception as e:
+                from eaccode.ui.commands import CommandResult
+
+                result = CommandResult(message=f"✗ command error: {e}")
             if result.message:
                 log.write(result.message)
             if result.should_exit:

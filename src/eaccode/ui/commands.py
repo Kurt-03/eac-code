@@ -59,8 +59,18 @@ def _cmd_mode(app, arg: str) -> CommandResult:
         )
     try:
         new_mode = PermissionMode(arg)
-        app.policy.mode = new_mode
+        # A1: policy lives on the agent, not the App (audit fix).
+        agent = getattr(app, "_agent", None)
+        if agent is None or agent.policy is None:
+            return CommandResult(
+                message="Agent not initialized yet — mode unchanged. "
+                        "Wait for startup to finish."
+            )
+        agent.policy.mode = new_mode
         app._mode_name = arg
+        refresh = getattr(app, "_refresh_status_rule", None)
+        if refresh is not None:
+            refresh()
         return CommandResult(message=f"Mode set to {arg}")
     except ValueError:
         if arg == "smart":
@@ -316,15 +326,23 @@ def _cmd_title(app, arg: str) -> CommandResult:
 def _cmd_hooks(app, arg: str) -> CommandResult:
     """E.12: /hooks — list hook scripts and their events."""
     from eaccode.config.paths import EaccodePaths
-    from eaccode.hooks.registry import discover_hooks
+    from eaccode.hooks.registry import EVENTS, discover_hooks, hook_for_event
 
-    hooks = discover_hooks(EaccodePaths().hooks_dir)
+    hooks_dir = EaccodePaths().hooks_dir
+    hooks = discover_hooks(hooks_dir)
     if not hooks:
         return CommandResult(message="No hooks installed (config/hooks/).")
+    # A3 (audit): discover_hooks returns list[Path], not a dict — group
+    # the scripts by the events they serve.
     lines = []
-    for event in sorted(hooks):
-        for h in hooks[event]:
-            lines.append(f"  {event}: {h}")
+    matched = set()
+    for event in sorted(EVENTS):
+        for h in hook_for_event(hooks_dir, event):
+            lines.append(f"  {event}: {h.name}")
+            matched.add(h)
+    for h in hooks:
+        if h not in matched:
+            lines.append(f"  (no event match): {h.name}")
     return CommandResult(message="Hooks:\n" + "\n".join(lines))
 
 

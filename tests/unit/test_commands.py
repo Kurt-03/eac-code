@@ -3,29 +3,38 @@
 from eaccode.ui.commands import handle_command
 
 
+class _Policy:
+    """Mirror of the real policy engine's mode surface."""
+
+    def __init__(self, parent):
+        self._parent = parent
+
+    @property
+    def mode(self):
+        return self._parent.policy_mode
+
+    @mode.setter
+    def mode(self, value):
+        self._parent.policy_mode = value
+
+
 class FakeApp:
-    def __init__(self):
+    def __init__(self, agent: bool = True):
         self.messages = []
         self.policy_mode = "default"
         self.remembered = None
+        # A1 (audit): policy lives on the agent, not the App.
+        self._agent = _Agent(self) if agent else None
+        self._mode_name = None
+        self._status_refreshes = 0
 
-    @property
-    def policy(self):
-        class _Policy:
-            _mode = "default"
+    def _refresh_status_rule(self):
+        self._status_refreshes += 1
 
-            def __init__(self, parent):
-                self._parent = parent
 
-            @property
-            def mode(self):
-                return self._parent.policy_mode
-
-            @mode.setter
-            def mode(self, value):
-                self._parent.policy_mode = value
-
-        return _Policy(self)
+class _Agent:
+    def __init__(self, parent):
+        self.policy = _Policy(parent)
 
 
 def test_help_command():
@@ -48,6 +57,16 @@ def test_mode_switch():
     result = handle_command("/mode acceptEdits", app)
     assert result.message is not None
     assert app.policy_mode == "acceptEdits"
+    assert app._mode_name == "acceptEdits"
+    assert app._status_refreshes == 1
+
+
+def test_mode_without_agent_is_guarded():
+    """A1 (audit): /mode must not crash when the agent is not built yet."""
+    app = FakeApp(agent=False)
+    result = handle_command("/mode safeAuto", app)
+    assert "not initialized" in result.message
+    assert app.policy_mode == "default"
 
 
 def test_mode_invalid():
