@@ -94,8 +94,8 @@ class EaccodeApp(App):
         color: $text-muted;
     }
     #prompt-glyph {
-        width: 2;
-        padding: 0 0 0 1;
+        width: 3;
+        padding: 0 1 0 1;
         color: $accent;
         content-align: right middle;
     }
