@@ -22,6 +22,7 @@ class StatusRule:
     indicator: str = ""          # spinner frame or ✓
     verb: str = ""               # "working…" / "idle"
     model: str = ""
+    branch: str = ""             # v0.0.1: current git branch (or "")
     context_used: int | None = None
     context_max: int | None = None
     cost_usd: float = 0.0
@@ -32,6 +33,8 @@ class StatusRule:
         left = ["─" if not self.busy else self.indicator or "⠋"]
         left.append(self.verb or ("working…" if self.busy else "idle"))
         left.append(self.model or "—")
+        if self.branch:
+            left.append(self.branch)
         ctx = self._context_label()
         if ctx:
             left.append(ctx)

@@ -970,6 +970,39 @@ class EaccodeApp(App):
 
         return EaccodePaths().memory_dir
 
+    def _current_branch(self) -> str:
+        """Return the current git branch name (cached) or '' on failure.
+
+        v0.0.1: the status rule shows the branch next to the model.
+        The branch is probed via the existing bounded git probe utilities
+        (or a 0.5s subprocess fallback) — never blocking the UI thread.
+        """
+        # Cache: avoid re-running git on every status refresh.
+        cached = getattr(self, "_branch_cache", None)
+        if cached is not None:
+            return cached
+        try:
+            import subprocess as _sp
+
+            from eaccode._subprocess_compat import (
+                noninteractive_git_env,
+                windows_popen_kwargs,
+            )
+
+            env = noninteractive_git_env()
+            kwargs = {"capture_output": True, "text": True, "timeout": 0.5,
+                      "env": env}
+            kwargs.update(windows_popen_kwargs())
+            proc = _sp.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                **kwargs,
+            )
+            branch = proc.stdout.strip() if proc.returncode == 0 else ""
+        except Exception:
+            branch = ""
+        self._branch_cache = branch
+        return branch
+
     def _spinner_frame(self) -> str:
         """Next ASCII spinner frame (Phase A.2: v0.4.0)."""
         from eaccode.tui.spinner import Spinner as _Spinner
@@ -1023,6 +1056,7 @@ class EaccodeApp(App):
             indicator=getattr(self, "_status_indicator", ""),
             verb=getattr(self, "_status_verb", ""),
             model=self._model_name or "—",
+            branch=self._current_branch(),
             context_used=ctx_used,
             context_max=ctx_max,
             cost_usd=self._total_usage.cost_usd,

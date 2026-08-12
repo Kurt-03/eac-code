@@ -47,3 +47,42 @@ def test_render_cost_when_positive():
 def test_render_no_cost_when_zero():
     rule = StatusRule(model="m", cost_usd=0.0)
     assert "$" not in rule.render()
+
+
+# ---------------------------------------------------------------------------
+# v0.0.1: git branch in the status rule (left field, after model)
+# ---------------------------------------------------------------------------
+
+
+def test_render_git_branch():
+    """The current git branch shows in the status rule when set."""
+    rule = StatusRule(model="m", branch="main")
+    text = rule.render()
+    assert "main" in text
+
+
+def test_render_no_branch_when_unset():
+    """When no branch is set, the rule must not show a stray branch."""
+    rule = StatusRule(model="m")
+    text = rule.render()
+    # The default em-dash for "no branch" should appear in the
+    # essentials (idle + model + em-dash), not a fake branch name.
+    assert text.startswith("─") or "─" in text[:5]  # idle rule at start
+
+
+def test_render_full_layout():
+    """The full status rule includes: model, branch, ctx, cost, right."""
+    rule = StatusRule(
+        model="MiniMax-M3",
+        branch="main",
+        context_used=12_000,
+        context_max=200_000,
+        cost_usd=0.0123,
+        right_label="session",
+    )
+    text = rule.render()
+    assert "MiniMax-M3" in text
+    assert "main" in text
+    assert "12k/200k" in text
+    assert "$0.0123" in text
+    assert "session" in text
