@@ -24,7 +24,7 @@ from eaccode.config.paths import EaccodePaths  # noqa: E402  (after guard)
 
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="0.1.0", prog_name="eaccode")
+@click.version_option(version="0.0.1", prog_name="eaccode")
 @click.option("--continue", "continue_session", is_flag=True,
               help="Resume the most recent session in the REPL")
 @click.option("--resume", "resume_id", default=None,

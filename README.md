@@ -1,6 +1,6 @@
-# eaccode
+# eaccode v0.0.1
 
-An autonomous coding agent CLI — Claude Code / Hermes-style. Reads and writes
+A Claude Code / Hermes-style autonomous coding agent CLI. Reads and writes
 files, runs shell commands, works autonomously over many turns, reviews code
 in parallel, and learns from every session. **BYOK**: bring your own API keys
 for any provider (MiniMax, opencode-go, Anthropic, OpenAI, ...).

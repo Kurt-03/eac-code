@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.0.1 (2026-08-12) — Redesign-Start (Hermes/Claude-Code-Parity)
+
+First release of the redesigned TUI. The repository reverts to v0.0.1 as
+the canonical start version; the prior v0.5.x source remains in git history
+as the foundation this work was built on.
+
+Focus of v0.0.1 → v0.1.0: the TUI must look and behave like Hermes / Claude Code.
+
+- Hermes-style transcript (single RichLog, no separate stream widget)
+- Inline permission prompt with a colored unified diff (red `-`, green `+`, cyan `@@`)
+- New `ALLOW_SESSION` choice (Quick-Pick `s`) — session-only allowlist
+- Quick-Pick legend (`y` once · `s` session · `a` always · `n` deny · `p` pause)
+- In-place live streaming (no duplicate render, no full re-parse)
+- 1-column prompt glyph + thin rule between transcript and composer
+- Status rule with tokens, cost, and current git branch
+
 ## v0.3.0 (2026-08-11) — PLAN-4 Masterplan, Phasen A–K
 
 ### Phase A — Skill-System

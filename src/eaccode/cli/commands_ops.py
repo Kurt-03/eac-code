@@ -193,7 +193,7 @@ def manifest_command() -> None:
     try:
         print_info(f"version: {pkg_version('eaccode')}")
     except PackageNotFoundError:
-        print_info("version: 0.1.0 (editable install)")
+        print_info("version: 0.0.1 (editable install)")
     import sys
 
     print_info(f"python: {sys.version.split()[0]}")
