@@ -99,6 +99,13 @@ class EaccodeApp(App):
         color: $accent;
         content-align: right middle;
     }
+    #composer-rule {
+        height: 1;
+        border: none;
+        padding: 0 1;
+        color: $border;
+        background: $background;
+    }
     #composer {
         height: 1;
         border: none;
@@ -194,13 +201,13 @@ class EaccodeApp(App):
     def compose(self) -> ComposeResult:
         # v0.5.0 (Hermes-style): transcript + slash overlay + composer
         # (with the prompt glyph prefix) + status rule. No Header/Footer.
+        # v0.0.1: a thin rule line between transcript and composer makes
+        # the layout read as a clean column (no box, no border).
         with Vertical():
             yield RichLog(id="transcript", wrap=True, markup=True,
                           highlight=False)
             yield Static(id="overlay")
-            # v0.0.1: the live stream renders IN the transcript via
-            # StreamingMarkdownRenderer (no separate static widget,
-            # no full re-parse). The Log owns the visual canvas.
+            yield Static("─" * 80, id="composer-rule")
             with Horizontal(id="composer-row"):
                 yield Static(self.skin.brand.prompt, id="prompt-glyph")
                 # I5 (audit): no inline ghost suggester — the fuzzy
