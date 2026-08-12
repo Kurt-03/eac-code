@@ -106,6 +106,10 @@ class AgentLoop:
         self.guardrails = ToolCallGuardrailController()
 
     async def run(self, messages: list[Message]) -> AgentResult:
+        # P7 (v0.7.2 followup): the classic REPL feeds us dicts; the
+        # legacy async API feeds us Message objects. Coerce once at
+        # the boundary so every internal call can assume Message.
+        messages = self._coerce_messages(messages)
         # Phase H.3: expand @-references in the LAST user message before
         # the LLM sees it (earlier turns were already expanded).
         messages = self._expand_user_references(messages)
@@ -396,8 +400,44 @@ class AgentLoop:
             f"Reached max_turns={self.config.max_turns} without a final answer"
         )
 
+    @staticmethod
+    def _coerce_messages(messages: list) -> list[Message]:
+        """Accept either ``Message`` objects or plain dicts.
+
+        The classic REPL (v0.7.2) builds messages as dicts
+        (``{"role": "user", "content": "hi"}``) because that matches what
+        it persists on disk / sends through the runner. The async API
+        on the other hand expects ``Message`` instances. Coercing here
+        keeps both paths working without changing any public API.
+        """
+        from eaccode.llm.models import Message as _Message
+
+        coerced: list[_Message] = []
+        for m in messages:
+            if isinstance(m, _Message):
+                coerced.append(m)
+                continue
+            if not isinstance(m, dict):
+                # Anything else: stringify and wrap as user message so
+                # the loop at least reports something.
+                coerced.append(_Message.user(str(m)))
+                continue
+            role = (m.get("role") or "user").lower()
+            content = m.get("content") or ""
+            tool_call_id = m.get("tool_call_id")
+            if role == "system":
+                coerced.append(_Message.system(content))
+            elif role == "assistant":
+                coerced.append(_Message.assistant(content))
+            elif role == "tool":
+                coerced.append(_Message.tool_result(tool_call_id or "", content))
+            else:
+                coerced.append(_Message.user(content))
+        return coerced
+
     def _expand_user_references(self, messages: list[Message]) -> list[Message]:
         """Phase H.3: expand @-references in the last user message."""
+        messages = self._coerce_messages(messages)
         if not messages or messages[-1].role.value != "user":
             return messages
         last = messages[-1]
