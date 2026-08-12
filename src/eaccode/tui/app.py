@@ -775,13 +775,17 @@ class EaccodeApp(App):
             on_tool_call=on_tool_call,
             on_tool_result=on_tool_result,
         )
-        # v0.5.0: spinner lives in the status rule — nothing to hide here.
+        # v0.0.1: stream fragments are already in the transcript via
+        # the StreamingMarkdownRenderer. Only flush any leftover buffer
+        # (e.g. an unclosed bold marker) — do NOT re-render the final
+        # text, which would duplicate the output.
         self._last_answer = result.final_text
-        from eaccode.tui.markdown import render_markdown
-
-        # B2 (audit): the final answer lands in the Log exactly once;
-        # the stream Static is cleared so it does not duplicate.
-        log.write(f"[magenta]⚡[/magenta] {render_markdown(result.final_text)}")
+        renderer = getattr(self, "_stream_renderer", None)
+        if renderer is not None:
+            tail = renderer.finalize()
+            if tail:
+                log.write(tail)
+            renderer.reset()
         self.messages.append({"role": "assistant", "content": result.final_text})
         # C.1: background review when the turn window is reached.
         if self._review_scheduler.should_review(result.turns):

@@ -93,7 +93,13 @@ async def test_repl_streaming_callbacks(repl_app, tmp_path):
         # raw expression only for unknown tools).
         assert any("⎿ Reading x.py" in line for line in lines)  # tool call line
         assert any("✓ read" in line for line in lines)  # tool result
-        assert any("Hello world" in line for line in lines)  # final answer
+        # v0.0.1: stream fragments are written live to the transcript.
+        # The text may be split across multiple lines (one per delta),
+        # so we check the joined text.
+        joined = "".join(lines)
+        assert "Hello" in joined and "world" in joined, (
+            f"expected streamed text in transcript, got: {joined!r}"
+        )
 
 
 @pytest.mark.asyncio
@@ -106,6 +112,9 @@ async def test_repl_verbose_off_hides_successful_tools(repl_app, tmp_path):
 
     class FakeAgent:
         async def run_streaming(self, history, **kwargs):
+            on_text = kwargs.get("on_text_delta")
+            if on_text:
+                on_text("done")
             kwargs["on_tool_call"](ToolCall(id="1", name="read", arguments={"path": "x.py"}))
             kwargs["on_tool_result"](
                 ToolCall(id="1", name="read", arguments={"path": "x.py"}),
@@ -126,7 +135,8 @@ async def test_repl_verbose_off_hides_successful_tools(repl_app, tmp_path):
         lines = [_strip_text(line) for line in app.query_one(RichLog).lines]
         assert not any("⎿" in line for line in lines)  # start hidden
         assert not any("✓ read" in line for line in lines)  # result hidden
-        assert any("done" in line for line in lines)  # final answer still there
+        joined = "".join(lines)
+        assert "done" in joined  # final answer still there (streamed live)
 
 
 def test_run_repl_passes_initial_messages(tmp_path, monkeypatch):
