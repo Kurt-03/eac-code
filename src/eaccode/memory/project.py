@@ -27,7 +27,7 @@ _CONTEXT_FILES = [
 ]
 
 
-def discover_project_context(workdir: Path) -> str:
+def discover_project_context(workdir: Path | None) -> str:
     """Discover and combine context files, nearest-first.
 
     EACCODE.md/.eaccode.md: first match wins (project identity).
@@ -42,10 +42,12 @@ def discover_project_context(workdir: Path) -> str:
     return "\n".join(sections)
 
 
-def _find_all(start: Path, name: str, walk: bool, chain: bool) -> list[Path]:
+def _find_all(start: Path | None, name: str, walk: bool, chain: bool) -> list[Path]:
     """Find context files. chain=True → every match up to the git root;
     otherwise first match wins."""
     found: list[Path] = []
+    if start is None:
+        start = Path.cwd()
     cur = start.resolve()
     while True:
         candidate = cur / name

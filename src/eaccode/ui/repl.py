@@ -53,6 +53,8 @@ def run_repl(workdir: Path | None = None,
         agent, _, _ = asyncio.run(build_agent_async(workdir=workdir))
     except Exception as e:
         print(f"[ X ] Agent init failed: {e}")
+        import traceback
+        traceback.print_exc()
         print("    Run `eaccode providers add` to configure a provider.")
         print("    (no LLM needed for /help, /status, /mode listing)")
         agent = None

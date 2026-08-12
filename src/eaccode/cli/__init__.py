@@ -64,7 +64,11 @@ def main(ctx: click.Context, continue_session: bool, resume_id: str | None) -> N
                 ]
                 workdir = session.metadata.get("cwd") or None
                 click.echo(f"Resumed session: {session.title}")
-        run_repl(workdir=Path(workdir) if workdir else None,
+        # Default workdir to the current working directory when the user
+        # invoked `eaccode` without args. Several subsystems (project
+        # context, memory hashing, workspace snapshot) used to crash
+        # when called with workdir=None.
+        run_repl(workdir=Path(workdir) if workdir else Path.cwd(),
                  initial_messages=initial_messages)
 
 
