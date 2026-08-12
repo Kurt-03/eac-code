@@ -2,6 +2,13 @@
 
 Tool-calling iteration: prompt → LLM → tool calls → permission gate →
 execute → results back to LLM → repeat until final answer or max_turns.
+
+Classic REPL support (v0.7.2 / Phase TUI-out):
+
+The TUI was removed; the loop now also exposes ``run_streaming_events``,
+a coroutine that yields ``AgentEvent`` records instead of calling
+Textual callbacks. ``agent.runner.run_repl_sync`` wraps the coroutine
+into a sync iterator for the classic REPL.
 """
 from __future__ import annotations
 

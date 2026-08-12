@@ -250,8 +250,31 @@ def _cmd_clear(app, arg: str) -> CommandResult:
 
 
 def _cmd_copy(app, arg: str) -> CommandResult:
-    app.action_copy_last()
-    return CommandResult()
+    """Copy the most recent assistant message to the system clipboard.
+
+    In the classic REPL (no Textual App), we read ``messages`` from the
+    proxy state and write the last assistant turn ourselves.
+    """
+    # Classic REPL path: pull messages off the proxy's state bag.
+    messages = app.messages if hasattr(app, "messages") else None
+    if isinstance(messages, list) and messages:
+        # Last assistant message in the list.
+        for entry in reversed(messages):
+            if isinstance(entry, dict) and entry.get("role") == "assistant":
+                content = entry.get("content") or ""
+                from eaccode.ui.clipboard import write_clipboard_text
+
+                if write_clipboard_text(content):
+                    return CommandResult(
+                        message=f"Copied {len(content)} char(s) to clipboard."
+                    )
+                return CommandResult(message="Clipboard write failed.")
+    # TUI fallback — legacy path, harmless when no App is wired.
+    action = getattr(app, "action_copy_last", None)
+    if action is not None:
+        app.action_copy_last()
+        return CommandResult()
+    return CommandResult(message="Nothing to copy yet.")
 
 
 def _cmd_verbose(app, arg: str) -> CommandResult:
@@ -565,8 +588,16 @@ def _cmd_context(app, arg: str) -> CommandResult:
 
 def _cmd_diff(app, arg: str) -> CommandResult:
     """/diff [staged|all|session] — git diff for the session (G.2)."""
-    from eaccode.ui.diff_cmd import run_diff
-
+    try:
+        from eaccode.ui.diff_cmd import run_diff
+    except ImportError:
+        # v0.7.2: the TUI-only diff module was removed. /diff is
+        # briefly out of service until a plain-stdout implementation
+        # replaces it.
+        return CommandResult(
+            message="/diff is unavailable in the classic REPL. "
+                    "Use `git diff` from a shell."
+        )
     mode = (arg or "staged").strip()
     if mode not in ("staged", "all", "session"):
         return CommandResult(message="Usage: /diff [staged|all|session]")

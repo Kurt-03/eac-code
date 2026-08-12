@@ -18,6 +18,9 @@ dependencies = [
   "pyyaml>=6.0",
   "orjson>=3.10",
   "websocket-client>=1.8",
+  # v0.7.2: classic REPL uses prompt_toolkit for cross-platform
+  # input editing + history (Windows has no `readline`).
+  "prompt_toolkit>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -33,10 +36,10 @@ llm = [
   "tenacity>=9.0",
   "tiktoken>=0.8",
 ]
-ui = [
-  "textual>=8.0",
-  "rich>=15.0",
-]
+# v0.7.2: TUI group is gone. `ui` is kept as a no-op alias for the
+# CLI install command (`pip install -e ".[all]"`) — removing it would
+# break existing scripts.
+ui = []
 mcp = [
   "mcp>=2.0",
 ]

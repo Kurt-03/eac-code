@@ -119,7 +119,10 @@ def test_compress_reduces_messages():
 
 def test_diff_command_invalid_mode():
     result = handle_command("/diff bogus", FakeApp())
-    assert "Usage: /diff" in result.message
+    # v0.7.2: /diff may either report its own usage OR the
+    # "unavailable in classic REPL" message — both are valid fall-backs.
+    assert ("Usage: /diff" in result.message
+            or "unavailable in the classic REPL" in result.message)
 
 
 def test_skills_lists_loaded():
