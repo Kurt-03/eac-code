@@ -10,10 +10,6 @@ TUI removal. No live LLM call.
 
 from __future__ import annotations
 
-import io
-import queue
-import sys
-
 
 def test_repl_module_smoke():
     """Just import + call run_repl's helpers — never start the loop."""
