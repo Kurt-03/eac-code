@@ -86,3 +86,19 @@ def curator_report() -> None:
     print_info(report.read_text(encoding="utf-8"))
 
 
+@curator.command("status")
+def curator_status() -> None:
+    """H8 (audit): status — does a report exist and how old is it?"""
+    import time
+
+    paths = EaccodePaths()
+    report = paths.data_dir / "curator_report.md"
+    if not report.exists():
+        print_info("curator: no report yet — run `eaccode curator run`")
+        return
+    age_h = (time.time() - report.stat().st_mtime) / 3600
+    size_kb = report.stat().st_size / 1024
+    print_info(f"curator: report exists ({size_kb:.1f} KB, "
+               f"{age_h:.1f} h old) — `eaccode curator report` to view")
+
+

@@ -196,6 +196,35 @@ async def test_permission_timeout_logs_denial_and_restores_input(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_input_history_up_down(tmp_path):
+    """I2 (audit): up/down navigate past prompts (Hermes behaviour)."""
+    from textual.widgets import Input
+
+    from eaccode.ui.repl import EaccodeApp
+
+    app = EaccodeApp(workdir=tmp_path)
+    agent, client = _make_agent(tmp_path, app._ask_permission_async)
+    await _prepare_app(tmp_path, agent, app)
+
+    async with app.run_test() as pilot:
+        inp = app.query_one("#input", Input)
+        inp.value = "erste frage"
+        await pilot.press("enter")
+        await pilot.pause(0.05)
+        app._remember_prompt("erste frage")
+        app._remember_prompt("zweite frage")
+        await pilot.press("up")
+        assert inp.value == "zweite frage"
+        await pilot.press("up")
+        assert inp.value == "erste frage"
+        await pilot.press("down")
+        assert inp.value == "zweite frage"
+        # down past the newest entry clears the composer
+        await pilot.press("down")
+        assert inp.value == ""
+
+
+@pytest.mark.asyncio
 async def test_permission_key_y_writes_file_and_restores_input(tmp_path):
     from textual.widgets import Input
 

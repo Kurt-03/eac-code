@@ -268,5 +268,5 @@ async def build_agent_async(
             # G8 (audit): the class has no delegate_builder slot — the
             # delegate tool reads it via getattr; setattr keeps mypy
             # honest while preserving the runtime wiring.
-            setattr(tool, "delegate_builder", build_agent_async)
+            tool.delegate_builder = build_agent_async
     return agent, client, sysctx

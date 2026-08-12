@@ -25,7 +25,6 @@ from eaccode.memory.store import MemoryStore
 from eaccode.sessions.store import SessionStore  # D.2: session persistence
 from eaccode.tools.base import ToolResult
 from eaccode.ui.commands import handle_command
-from eaccode.ui.suggester import SlashCommandSuggester
 
 
 class PermissionAwareInput(Input):
@@ -37,6 +36,9 @@ class PermissionAwareInput(Input):
     checks the app's pending ask first and resolves it instead of
     inserting the character; otherwise it must ``await`` the base
     handler (a sync call would drop the insert coroutine).
+
+    I2 (audit): up/down also navigate the prompt history when the app
+    has one (Hermes' useInputHistory behaviour).
     """
 
     async def _on_key(self, event) -> None:
@@ -45,6 +47,19 @@ class PermissionAwareInput(Input):
             key = event.key.lower()
             if key in ("y", "a", "n", "p", "escape"):
                 app._resolve_pending_permission("n" if key == "escape" else key)
+                event.stop()
+                event.prevent_default()
+                return
+        history = getattr(app, "_input_history", [])
+        if history:
+            key = event.key.lower()
+            if key == "up":
+                app._history_navigate(-1)
+                event.stop()
+                event.prevent_default()
+                return
+            if key == "down":
+                app._history_navigate(1)
                 event.stop()
                 event.prevent_default()
                 return
@@ -130,6 +145,9 @@ class EaccodeApp(App):
         self._current_task = None
         self._model_name = ""
         self._mode_name = ""
+        # I2 (audit): prompt history (up/down), Hermes-style.
+        self._input_history: list[str] = []
+        self._history_idx: int | None = None
         self._show_reasoning = False
         self._total_usage = TokenUsage()
         self._usage_by_model: dict[str, TokenUsage] = {}  # J.6: per-model
@@ -160,7 +178,6 @@ class EaccodeApp(App):
         import asyncio
 
         self._estop_flag = asyncio.Event()
-        self._suggester = SlashCommandSuggester(cwd=self.workdir)
         self._spinner_interval = None
         # v0.5.0: Hermes-style slash overlay (fuzzy-ranked).
         from eaccode.tui.slash_overlay import SlashOverlay
@@ -192,10 +209,11 @@ class EaccodeApp(App):
             yield Static(id="stream")
             with Horizontal(id="composer-row"):
                 yield Static(self.skin.brand.prompt, id="prompt-glyph")
+                # I5 (audit): no inline ghost suggester — the fuzzy
+                # slash overlay is the only completion UI.
                 yield PermissionAwareInput(
                     placeholder="ask eaccode…  (/ for commands)",
                     id="input",
-                    suggester=self._suggester,
                 )
             yield Static(id="status-rule")
 
@@ -303,6 +321,35 @@ class EaccodeApp(App):
         except Exception:
             pass
 
+    def _remember_prompt(self, text: str) -> None:
+        """Push a submitted prompt onto the history (I2, Hermes-style)."""
+        if not text or text.startswith("/"):
+            return
+        if self._input_history and self._input_history[-1] == text:
+            return
+        self._input_history.append(text)
+        del self._input_history[:-50]  # cap
+        self._history_idx = None
+
+    def _history_navigate(self, delta: int) -> None:
+        """Move through the prompt history; up/down (I2)."""
+        if not self._input_history:
+            return
+        try:
+            inp = self.query_one("#input", Input)
+        except Exception:
+            return
+        if self._history_idx is None:
+            self._history_idx = len(self._input_history) - 1 if delta < 0 \
+                else len(self._input_history)
+        else:
+            self._history_idx += delta
+        if self._history_idx < 0 or self._history_idx >= len(self._input_history):
+            self._history_idx = None
+            inp.value = ""
+            return
+        inp.value = self._input_history[self._history_idx]
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         log = self.query_one("#transcript", RichLog)
         # J.35: input sanitization — strip control characters, trim.
@@ -318,6 +365,14 @@ class EaccodeApp(App):
         log.write(f"[bold cyan]❯[/bold cyan] {_esc(text)}\n")
 
         if text.startswith("/"):
+            # I4 (audit): Enter picks the highlighted overlay entry
+            # instead of sending the raw typed text.
+            if self._overlay.items:
+                current = self._overlay.current()
+                if current is not None:
+                    typed_cmd = text.split()[0]
+                    if typed_cmd != f"/{current['name']}":
+                        text = f"/{current['name']}"
             # A2 (audit): a failing slash command must never take down
             # the whole TUI — log a red line instead.
             try:
@@ -354,6 +409,8 @@ class EaccodeApp(App):
 
         self.messages.append({"role": "user", "content": text})
         self._last_prompt = text
+        self._remember_prompt(text)
+        self._overlay.update("")  # close the menu after the submit
         self._busy = True
         # v0.5.2 (CRITICAL): do NOT await the turn inside the event
         # handler. Textual 8's message pump queues every key event while

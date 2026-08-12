@@ -31,10 +31,13 @@ def queue_status() -> None:
     counts: dict[str, int] = {}
     for j in jobs:
         counts[j.status.value] = counts.get(j.status.value, 0) + 1
-    print_info(
-        f"pool: max {settings.max_parallel_agents} concurrent  |  "
-        + "  ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
-    )
+    # H7 (audit): drop the trailing empty segment when there are no jobs.
+    segments = [f"pool: max {settings.max_parallel_agents} concurrent"]
+    if counts:
+        segments.append(
+            "  ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
+        )
+    print_info("  |  ".join(segments))
     icons = {"queued": "⏳", "running": "▶", "done": "✓", "failed": "✗"}
     for j in jobs[:15]:
         print_info(

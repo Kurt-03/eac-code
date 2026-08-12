@@ -38,10 +38,9 @@ class SearchFilesTool(Tool):
         if not base.is_absolute():
             base = ctx.workdir / base
 
-        import shutil
-
         # C2 (audit): never block the Textual event loop.
         import asyncio
+        import shutil
 
         if shutil.which("rg"):
             return await asyncio.to_thread(self._run_ripgrep, input, base)
