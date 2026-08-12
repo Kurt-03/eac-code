@@ -156,7 +156,14 @@ def _handle_choice(
 def _remember_rule(session_rules: list[Rule], tool: str, arguments: dict) -> None:
     """Remember "always allow this command pattern" for the session."""
     if tool == "bash":
+        # P7/C.1: fnmatch('ls', 'ls *') is False (a bare token after a
+        # space requires at least one char). Use 'ls*' so 'ls' alone
+        # and 'ls -la' both match. '*' alone also matches via the else
+        # branch below — never leave a hole.
         head = arguments.get("command", "").split()[0] if arguments.get("command") else "*"
-        session_rules.append(Rule(tool=tool, action=Action.ALLOW, pattern=f"{head} *"))
+        if head == "*":
+            session_rules.append(Rule(tool=tool, action=Action.ALLOW, pattern="*"))
+        else:
+            session_rules.append(Rule(tool=tool, action=Action.ALLOW, pattern=f"{head}*"))
     else:
         session_rules.append(Rule(tool=tool, action=Action.ALLOW, pattern="*"))

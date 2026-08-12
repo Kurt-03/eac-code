@@ -1,7 +1,20 @@
 """Policy engine (Task 4.1) — 4 modes x rules decide allow/ask/deny.
 
-Priority: explicit DENY rules win over everything, then ALLOW rules,
-then the mode default.
+P7/C.1 Decision table (priority top→bottom; first match wins):
+
+  1. Explicit DENY rule                          → DENY
+  2. Explicit ALLOW rule (mode ≠ BYPASS)          → ALLOW (overrides ASK/DENY mode)
+  3. Session-rule (from (a) at an ASK prompt)     → ALLOW (this session only)
+  4. Persistent allowlist match (always)          → ALLOW (yields to 1 only)
+  5. Mode default:
+     - BYPASS_PERMISSIONS  → ALLOW (everything)
+     - SAFE_AUTO           → ALLOW (safe tools + bash pattern classifier),
+                            ASK for unknown bash, ASK otherwise
+     - ACCEPT_EDITS        → ALLOW (write/edit), ASK (bash), ALLOW (safe reads)
+     - PLAN                → DENY (mutating), ALLOW (safe reads)
+     - DEFAULT             → ASK (bash/write/edit), ALLOW (safe reads)
+
+Tests: tests/unit/test_policy_matrix.py (one assertion per cell).
 """
 from __future__ import annotations
 
