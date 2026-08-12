@@ -19,7 +19,17 @@ class Decision:
 
 
 # Per-mode defaults: which tools ask, which are safe
-_SAFE_TOOLS = ("read", "glob", "grep", "web_fetch", "web_search", "todo", "session_search")
+# E3/E4 (audit): read-only tools are never asked about — Claude Code and
+# Hermes don't prompt for reads. "todo" was a tool name that does not
+# exist (it is todo_write), so the agent got asked permission to write
+# a todo list in default mode.
+_SAFE_TOOLS = (
+    "read", "glob", "grep", "search_files",
+    "web_fetch", "web_extract", "web_search",
+    "tool_search", "clarify", "session_search",
+    "memory_recall", "skill_list", "skill_view",
+    "todo_write",
+)
 
 _MODE_DEFAULTS: dict[PermissionMode, dict[str, Action]] = {
     PermissionMode.DEFAULT: {

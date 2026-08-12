@@ -25,10 +25,24 @@ def test_safe_url_blocks_non_http():
 
 
 def test_protected_credential_files(tmp_path):
+    """E7 (audit): credential files are only protected under eaccode's
+    own config dir — a project's .env is legitimate agent input."""
+    from eaccode.config.paths import EaccodePaths
+
+    config_dir = EaccodePaths().config_dir
+    config_dir.mkdir(parents=True, exist_ok=True)
     for name in (".env", "providers.yaml", "allowlist.json"):
-        f = tmp_path / name
+        f = config_dir / name
         f.write_text("x")
         assert is_protected_path(f) is True
+
+
+def test_project_env_file_is_not_protected(tmp_path):
+    """E7 (audit): the old code blocked every .env on disk — a project
+    .env the agent is supposed to work with must stay readable."""
+    f = tmp_path / ".env"
+    f.write_text("x")
+    assert is_protected_path(f) is False
 
 
 def test_protected_package_dir():

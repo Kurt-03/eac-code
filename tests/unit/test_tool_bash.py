@@ -75,6 +75,7 @@ async def test_bash_timeout_kills_process_tree(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_bash_passes_hidden_window_flags_on_windows(monkeypatch, tmp_path):
     """On Windows the child must get CREATE_NO_WINDOW (errno 9 guard)."""
+    from eaccode import _subprocess_compat as compat
     from eaccode.tools.builtin import bash as bash_mod
 
     captured = {}
@@ -83,7 +84,12 @@ async def test_bash_passes_hidden_window_flags_on_windows(monkeypatch, tmp_path)
         captured.update(popen_kwargs)
         return __import__("subprocess").CompletedProcess(command, 0, b"ok", b"")
 
+    # F6 (audit): bash.py reads IS_WINDOWS from _subprocess_compat, so
+    # the whole module pair must be patched — the old test only patched
+    # the bash copy and could never be green.
     monkeypatch.setattr(bash_mod, "IS_WINDOWS", True)
+    monkeypatch.setattr(compat, "IS_WINDOWS", True)
+    monkeypatch.setattr(compat, "windows_hide_flags", lambda: 0x08000000)
     monkeypatch.setattr(bash_mod.BashTool, "_run_bounded", staticmethod(fake_run_bounded))
     tool = BashTool()
     ctx = ToolContext(workdir=tmp_path)

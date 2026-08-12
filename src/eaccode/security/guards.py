@@ -37,10 +37,23 @@ def is_protected_path(path: Path, workdir: Path | None = None) -> bool:
         resolved = path.resolve()
     except OSError:
         return False
-    # Credential files under any eaccode config dir.
+    # E7 (audit): credential files are only sacred under eaccode's own
+    # config dir — a project's legitimate .env is agent input, not a
+    # secret to guard (the old code blocked every .env on disk).
     name = resolved.name.lower()
     if name in (".env", "providers.yaml", "allowlist.json", "mcp.yaml"):
-        return True
+        try:
+            from eaccode.config.paths import EaccodePaths
+
+            config_dir = EaccodePaths().config_dir.resolve()
+        except Exception:
+            config_dir = None
+        if config_dir is not None:
+            try:
+                resolved.relative_to(config_dir)
+                return True
+            except ValueError:
+                pass
     # The eaccode package install itself (H.20): the agent must not
     # rewrite its own source through tools.
     pkg = Path(__file__).resolve().parent.parent  # .../site-packages/eaccode
@@ -58,7 +71,6 @@ _INJECTION_PATTERNS = [
     re.compile(r"ignore (all )?(previous|prior|above) instructions", re.I),
     re.compile(r"disregard (the )?(previous|above) (instructions|prompt)", re.I),
     re.compile(r"you are now (a )?(?:chatgpt|an? ?\w+ agent)[,.]", re.I),
-    re.compile(r"system prompt", re.I),
     re.compile(r"pretend (you are|to be)", re.I),
     re.compile(r"forget (everything|all instructions)", re.I),
 ]

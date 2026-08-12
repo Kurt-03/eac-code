@@ -12,8 +12,10 @@ jobs:
         with:
           python-version: "${{ matrix.python }}"
       - name: Install
+        # F1 (audit): [dev] alone lacks llm/ui/mcp extras — 13 test
+        # modules failed to even collect on CI.
         run: |
-          pip install -e ".[dev]"
+          pip install -e ".[all]"
       - name: Lint
         run: ruff check src tests
       - name: Type check
