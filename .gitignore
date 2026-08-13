@@ -28,4 +28,3 @@ Thumbs.db
 
 # eaccode runtime checkpoints (H1 audit: test artifacts were committed)
 .eaccode/checkpoints/
-.eaccode/

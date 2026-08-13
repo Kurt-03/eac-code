@@ -3,6 +3,20 @@
 import queue
 
 
+def _con():
+    """Build a non-TTY Console so the renderer prints plain lines.
+
+    The tests capture sys.stdout / sys.stderr via capsys; Rich's Live
+    overlay would write ANSI codes and break those assertions. A
+    non-terminal Console produces clean plain text instead.
+    """
+    from eaccode.ui.rich_console import make_console
+    return make_console(force_terminal=False)
+
+
+
+
+
 def test_repl_module_imports():
     """The new ui.repl module imports without Textual."""
     from eaccode.ui import repl
@@ -80,7 +94,7 @@ def test_handle_event_text_writes_to_stdout(capsys):
     from eaccode.ui.repl import _handle_event
 
     ev = AgentEvent(kind="text", payload={"delta": "hello world"})
-    _handle_event(ev, ReplContext(), [], queue.Queue())
+    _handle_event(ev, ReplContext(), [], queue.Queue(), _con())
     captured = capsys.readouterr()
     assert "hello world" in captured.out
 
@@ -97,7 +111,7 @@ def test_handle_event_permission_writes_prompt(capsys, monkeypatch):
         "question": "Allow bash?",
     })
     resolves: queue.Queue = queue.Queue()
-    _handle_event(ev, ReplContext(), [], resolves)
+    _handle_event(ev, ReplContext(), [], resolves, _con())
     captured = capsys.readouterr()
     assert "Allow bash?" in captured.out
     # resolve arrived
@@ -112,10 +126,12 @@ def test_handle_event_done_newline(capsys):
     from eaccode.ui.context import ReplContext
     from eaccode.ui.repl import _handle_event
 
-    _handle_event(AgentEvent(kind="done"), ReplContext(), [], queue.Queue())
+    _handle_event(AgentEvent(kind="done"), ReplContext(), [], queue.Queue(), _con())
     captured = capsys.readouterr()
-    # Newline + flush
-    assert captured.out == "\n"
+    # The render path emits a trailing newline to close the assistant
+    # streaming line; Rich's Console may add another for layout. We
+    # just check that the stream ended with at least one newline.
+    assert captured.out.endswith("\n")
 
 
 def test_handle_event_tool_call_writes_card(capsys):
@@ -126,7 +142,7 @@ def test_handle_event_tool_call_writes_card(capsys):
     ev = AgentEvent(kind="tool_call", payload={
         "id": "1", "name": "bash", "arguments": {"command": "ls"},
     })
-    _handle_event(ev, ReplContext(), [], queue.Queue())
+    _handle_event(ev, ReplContext(), [], queue.Queue(), _con())
     captured = capsys.readouterr()
     assert "bash" in captured.out
     assert "ls" in captured.out

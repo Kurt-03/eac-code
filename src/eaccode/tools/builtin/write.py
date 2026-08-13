@@ -30,11 +30,16 @@ class WriteTool(Tool):
         denied = write_denied_error(path)
         if denied:
             return ToolResult(content=denied, is_error=True)
-        from eaccode.tools.checkpoints import save_checkpoint
 
-        save_checkpoint(ctx.workdir, path)  # Phase C.4 snapshot
         try:
             with lock_path(path):  # P0.5: per-path write coordination
+                # P0.1 (audit): the snapshot is best-effort — a failed
+                # checkpoint in C:\WINDOWS\System32\.eaccode must not
+                # kill an otherwise-legal write to the user's Desktop.
+                import contextlib
+                with contextlib.suppress(OSError, PermissionError):
+                    from eaccode.tools.checkpoints import save_checkpoint
+                    save_checkpoint(ctx.workdir, path)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 import asyncio
 

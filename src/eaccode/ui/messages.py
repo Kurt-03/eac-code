@@ -42,13 +42,19 @@ def render_event_plain(event) -> str:
     Token deltas (text/reasoning) are intentionally NOT rendered here —
     they need inline streaming (no trailing newline). The REPL loop
     handles them itself.
+
+    P0.5 (audit): for ``tool_call`` we now show *one* meaningful argument
+    in the headline (path for write/edit, command for bash, pattern
+    for grep) instead of dumping every key=value. A 5 KB write
+    payload no longer ends up in the user's terminal.
     """
     if event.kind == "tool_call":
         name = event.payload.get("name", "?")
-        args = event.payload.get("arguments", {})
-        # Compact one-line summary, args dumped after the name.
-        arg_str = " ".join(f"{k}={v!r}" for k, v in args.items())
-        return f"▸ {name} {arg_str}".rstrip()
+        args = event.payload.get("arguments", {}) or {}
+        headline = _one_arg_summary(name, args)
+        if headline:
+            return f"▸ {name} {headline}"
+        return f"▸ {name}"
     if event.kind == "tool_result":
         name = event.payload.get("name", "?")
         content = (event.payload.get("content") or "").strip()
@@ -69,6 +75,47 @@ def render_event_plain(event) -> str:
     if event.kind == "done":
         return ""
     # text / reasoning: caller handles inline printing
+    return ""
+
+
+# Per-tool "the one argument that matters" picker.
+_ARG_HEADLINE_KEYS: dict[str, tuple[str, ...]] = {
+    "write":       ("path",),
+    "edit":        ("path",),
+    "read":        ("path",),
+    "grep":        ("pattern", "path"),
+    "glob":        ("pattern", "path"),
+    "bash":        ("command",),
+    "process":     ("action",),
+    "web_fetch":   ("url",),
+    "web_extract": ("url",),
+    "web_search":  ("query",),
+    "delegate_task": ("prompt",),
+    "skill_create":  ("name",),
+    "skill_patch":   ("name",),
+    "memory_remember": ("fact",),
+}
+
+
+def _one_arg_summary(tool_name: str, args: dict) -> str:
+    """Pick the single argument that explains the call.
+
+    Long values are truncated so a 5 KB file body doesn't end up in the
+    headline. Returned without quotes (so paths and shell commands stay
+    copy-pasteable).
+    """
+    keys = _ARG_HEADLINE_KEYS.get(tool_name)
+    if not keys:
+        return ""
+    for key in keys:
+        value = args.get(key)
+        if value is None:
+            continue
+        text = str(value)
+        # 120 chars is plenty for a headline; longer gets "…".
+        if len(text) > 120:
+            text = text[:120] + "…"
+        return f"{key}={text}"
     return ""
 
 

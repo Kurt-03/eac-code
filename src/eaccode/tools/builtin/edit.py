@@ -36,12 +36,17 @@ class EditTool(Tool):
         denied = write_denied_error(path)
         if denied:
             return ToolResult(content=denied, is_error=True)
-        from eaccode.tools.checkpoints import save_checkpoint
 
-        save_checkpoint(ctx.workdir, path)  # Phase C.4 snapshot
         if not path.exists():
             return ToolResult(content=f"Error: file not found: {path}", is_error=True)
         try:
+            # P0.1 (audit): the snapshot is best-effort — a failed
+            # checkpoint in C:\WINDOWS\System32\.eaccode must not
+            # kill an otherwise-legal edit.
+            import contextlib
+            with contextlib.suppress(OSError, PermissionError):
+                from eaccode.tools.checkpoints import save_checkpoint
+                save_checkpoint(ctx.workdir, path)
             import asyncio
 
             # C6 (audit): file I/O must not block the Textual event loop.

@@ -2,6 +2,8 @@
 
 - ``safe_url``        — only http/https URLs (H.11)
 - ``is_protected_path`` — eaccode install + credential files (H.20/H.22)
+- ``is_system_path``   — system dirs that must never be written (Plan 224)
+- ``is_instruction_file`` — AGENTS.md, CLAUDE.md etc. always ask (Plan 229)
 - ``detect_injection``  — prompt-injection patterns in tool output (H.21)
 - ``display_arguments`` — redacted + canonicalized args for the modal (H.1)
 """
@@ -63,6 +65,85 @@ def is_protected_path(path: Path, workdir: Path | None = None) -> bool:
     except ValueError:
         pass
     return False
+
+
+# Plan 224-228 — Hermes-style system path denylist. These prefixes
+# never get a confirmation prompt; the tool call is rejected outright
+# with a hint that the user should run the command themselves in a
+# terminal. The list deliberately does NOT cover everything under
+# /private/var (Plan 225) — macOS parks $TMPDIR there.
+_SENSITIVE_PATH_PREFIXES: tuple[str, ...] = (
+    # Linux
+    "/etc/", "/boot/", "/usr/lib/systemd/", "/var/run/",
+    # macOS — exact sub-paths only, not whole /private/var
+    "/private/etc/", "/private/var/db/", "/private/var/root/",
+    # Windows — case-insensitive in matching code below
+    "C:/Windows/", "C:/Program Files/", "C:/Program Files (x86)/",
+    "C:/ProgramData/",
+)
+
+# Exact docker socket paths (Plan 226). These are files, not dirs.
+_SENSITIVE_EXACT_PATHS: tuple[str, ...] = (
+    "/var/run/docker.sock",
+    "/run/docker.sock",
+)
+
+
+def _normalize_for_match(path: Path) -> str:
+    """Lower-case forward-slash string for prefix matching.
+
+    On Windows, Path comparison with ``\\`` is finicky; we normalize to
+    POSIX form and lowercase so prefix checks work consistently.
+    """
+    return str(path).replace("\\", "/").lower()
+
+
+def is_system_path(path: Path) -> bool:
+    """True if *path* lives under a system directory that must never be
+    written, deleted, or in-place-edited. Rejected outright — Plan 224.
+
+    The eaccode config dir itself is its own thing (see ``is_protected_path``);
+    this function focuses on *external* system paths so we don't trip
+    on the user's own machine config.
+    """
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    norm = _normalize_for_match(resolved)
+    for prefix in _SENSITIVE_PATH_PREFIXES:
+        # Strip the trailing slash so "/etc" also matches "/etc/passwd";
+        # a literal "/etc/" prefix would miss the bare directory.
+        bare = prefix.rstrip("/").lower()
+        if norm == bare or norm.startswith(bare + "/"):
+            return True
+    if norm in {p.lower() for p in _SENSITIVE_EXACT_PATHS}:
+        return True
+    return False
+
+
+# Plan 229-234 — Hermes-style instruction-file denylist. These files
+# always require a confirmation prompt, even under bypass/yolo mode.
+# A poisoned instruction file survives the turn and contaminates every
+# future session. Basenames match in any directory because the agent
+# may read a file from anywhere on disk.
+_PROTECTED_INSTRUCTION_BASENAMES: frozenset[str] = frozenset({
+    # Hermes originals
+    "agents.md", "claude.md", "soul.md", ".cursorrules",
+    # eaccode-specific — match the names our memory layer writes.
+    "eaccode.md", "user.md", "memory.md",
+})
+
+
+def is_instruction_file(path: Path) -> bool:
+    """True if *path* is an instruction file the agent must always ask
+    about before reading or writing.
+
+    ``is_instruction_file`` returns True for ANY path whose basename
+    matches the protected set, regardless of where it lives. Callers
+    use this to force the permission gate even when yolo/mode=off is on.
+    """
+    return path.name.lower() in _PROTECTED_INSTRUCTION_BASENAMES
 
 
 # --------------------------------------------------------------- H.21

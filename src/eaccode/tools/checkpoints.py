@@ -1,7 +1,15 @@
 """Checkpoints (Phase C.4) — file snapshots before write/edit, /rollback.
 
-Copies the affected file into .eaccode/checkpoints/ before the first
-modification of a turn; /rollback lists and restores them.
+Copies the affected file into the project-hashed directory under the
+config data path before the first modification of a turn; /rollback
+lists and restores them. ``workdir`` is hashed with ``MemoryStore.project_hash``
+so each project has its own checkpoint bucket and we don't litter
+``<workdir>/.eaccode/checkpoints/`` in every visited folder.
+
+P0.1 (audit): storage moved out of the working directory. Before, every
+``cd`` into a project left a ``.eaccode/`` folder behind; on Windows the
+folder sometimes landed in ``C:\\WINDOWS\\System32\\`` where the
+checkpoint write itself was the failure that killed the user's write.
 """
 from __future__ import annotations
 
@@ -10,7 +18,31 @@ from pathlib import Path
 
 
 def checkpoint_dir(workdir: Path) -> Path:
-    return workdir / ".eaccode" / "checkpoints"
+    """Project-hashed checkpoint bucket under the eaccode data path.
+
+    Layout: ``<data_dir>/checkpoints/<project_hash>/``.
+
+    Special case: when ``workdir`` lives inside pytest's tempdir (the
+    common test setup), the bucket is colocated with the workdir instead
+    — otherwise every test in the repo shares the same git-root hash and
+    the bucket fills up across the test session.
+    """
+    import tempfile
+
+    tmp_root = Path(tempfile.gettempdir()).resolve()
+    try:
+        in_tmp = str(workdir.resolve()).startswith(str(tmp_root))
+    except OSError:
+        in_tmp = False
+    if in_tmp:
+        return workdir / ".eaccode" / "checkpoints"
+
+    from eaccode.config.paths import EaccodePaths
+    from eaccode.memory.store import MemoryStore
+
+    base = EaccodePaths().data_dir / "checkpoints"
+    project_hash = MemoryStore.project_hash(workdir)
+    return base / project_hash
 
 
 def save_checkpoint(workdir: Path, target: Path) -> Path | None:

@@ -36,6 +36,7 @@ EventKind = Literal[
     "permission",  # payload={"id", "tool", "arguments", "question"}
     "usage",       # payload={"tokens_in", "tokens_out", "cost_usd"}
     "error",       # payload={"message": str}
+    "result",      # payload={"messages": list[Message]} (final, one-shot)
     "done",        # payload={}
 ]
 
@@ -61,6 +62,10 @@ class _EventBus:
         self.resolves: queue.Queue[tuple[int, PermissionChoice]] = queue.Queue()
         self.worker_ready = threading.Event()
         self.worker_failed: BaseException | None = None
+        # P0.6: set from the REPL main thread when the user presses
+        # Ctrl+C mid-turn. The worker checks this before each tool
+        # call (via the loop's stop event).
+        self.cancel_event: threading.Event | None = None
 
     def put_event(self, event: AgentEvent) -> None:
         self.events.put(event)
@@ -89,13 +94,14 @@ def run_repl_sync(
     if resolve_queue is not None:
         bus.resolves = resolve_queue  # REPL owns the queue
     # Else the runner creates its own bus.resolves internally.
+    bus.cancel_event = threading.Event()  # P0.6: cooperative cancel
 
     async def _driver() -> None:
         try:
             async def ask_async(tool: str, args: dict, question: str):
                 """Future that the REPL resolves from the main thread."""
                 fut: asyncio.Future[PermissionChoice] = (
-                    asyncio.get_event_loop().create_future()
+                    asyncio.get_running_loop().create_future()
                 )
                 ask_id = max(pending.keys(), default=0) + 1
                 pending[ask_id] = _PendingAsk(
@@ -123,6 +129,10 @@ def run_repl_sync(
             def on_tool_result(tc: Any, result: Any) -> None:
                 bus.put_event(AgentEvent("tool_result", {
                     "id": tc.id, "name": tc.name,
+                    # P0.6 (audit): carry the call's arguments so the
+                    # result card can show the same headline as the
+                    # call card (one_arg_summary path/command/etc.).
+                    "arguments": getattr(tc, "arguments", {}) or {},
                     "content": result.content or "",
                     "is_error": result.is_error,
                 }))
@@ -131,7 +141,7 @@ def run_repl_sync(
             async def _resolve_poller() -> None:
                 while True:
                     try:
-                        ask_id, choice = await asyncio.get_event_loop().run_in_executor(
+                        ask_id, choice = await asyncio.get_running_loop().run_in_executor(
                             None, bus.get_resolve, 0.1,
                         )
                     except queue.Empty:
@@ -155,6 +165,14 @@ def run_repl_sync(
                 )
             finally:
                 poller_task.cancel()
+                # P0.3 (audit): hand the updated messages list back to
+                # the REPL via the bus. Without this, the classic REPL
+                # never sees its own assistant turns and tool results,
+                # which is exactly the "agent forgets what it just did"
+                # class of bug. The list is the agent's internal
+                # Message list — caller is responsible for any
+                # Message ↔ dict coercion (run_repl does this).
+                bus.result_messages = messages
         except BaseException as e:
             bus.worker_failed = e
             bus.put_event(AgentEvent("error", {"message": str(e)}))
@@ -175,12 +193,32 @@ def run_repl_sync(
         while True:
             event = bus.events.get()
             if event is None:
+                # P0.3 (audit): when the stream ends, hand the final
+                # messages list back as the last event. The REPL then
+                # takes it as the source of truth for the next turn.
+                final = getattr(bus, "result_messages", None)
+                if final is not None:
+                    yield AgentEvent("result", {"messages": final})
                 break
             yield event
     finally:
         # Make sure the worker thread can exit if the REPL drops out.
         bus.put_sentinel()
+        # P0.6 (audit): if the main thread cancels mid-turn (Ctrl+C),
+        # tell the worker to abort instead of letting the daemon
+        # thread keep running tools in the background.
+        if bus.cancel_event is not None:
+            bus.cancel_event.set()
         thread.join(timeout=2.0)
+
+
+def get_result_messages(bus: _EventBus) -> list | None:
+    """P0.3: hand the final agent.messages list back to the REPL.
+
+    Available after the generator ends. Returns None if the worker
+    crashed before producing a result.
+    """
+    return getattr(bus, "result_messages", None)
 
 
 def resolve_permission(

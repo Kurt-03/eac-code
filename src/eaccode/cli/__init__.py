@@ -8,6 +8,7 @@ Command hierarchy (see plan, section "CLI Command Tree"):
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -39,37 +40,52 @@ def main(ctx: click.Context, continue_session: bool, resume_id: str | None) -> N
                 "Use: eaccode run <prompt> (headless)"
             )
             return
-        from eaccode.ui.repl import run_repl
+        # P0.2 (audit): Directories we never want the agent workdir to land in.
+# PowerShell opens in C:\Windows\System32 by default; bash logins can
+# land in /etc. When we detect one of these, we fall back to the user's
+# home directory with a warning, instead of letting the agent operate
+# in a system folder.
+_UNSAFE_WORKDIR_PREFIXES_WINDOWS: tuple[str, ...] = (
+    r"C:\Windows",
+    r"C:\Program Files",
+    r"C:\Program Files (x86)",
+    r"C:\ProgramData",
+)
+_UNSAFE_WORKDIR_EXACT_UNIX: tuple[str, ...] = (
+    "/", "/etc", "/usr", "/var",
+    "/bin", "/sbin", "/boot", "/lib", "/lib64",
+)
+_UNSAFE_WORKDIR_PREFIX_UNIX: tuple[str, ...] = (
+    "/etc/", "/var/", "/usr/", "/boot/", "/lib/", "/lib64/",
+)
 
-        initial_messages = None
-        workdir = None
-        if continue_session or resume_id:
-            import asyncio
 
-            from eaccode.sessions.store import SessionStore
+def _safe_workdir() -> Path | None:
+    r"""Pick a safe working directory, or None if Path.cwd() is fine."""
+    cwd = Path.cwd()
+    cwd_str = str(cwd).replace("/", "\\") if os.name == "nt" else str(cwd)
+    cwd_lower = cwd_str.lower()
 
-            store = SessionStore(EaccodePaths().sessions_dir / "sessions.db")
-            session = None
-            if resume_id:
-                session = asyncio.run(store.load(resume_id))
-            else:
-                recent = asyncio.run(store.list_sessions(limit=1))
-                if recent:
-                    session = asyncio.run(store.load(recent[0].id))
-            if session:
-                initial_messages = [
-                    {"role": m.role.value, "content": m.text}
-                    for m in session.messages
-                    if m.role.value in ("user", "assistant") and m.text
-                ]
-                workdir = session.metadata.get("cwd") or None
-                click.echo(f"Resumed session: {session.title}")
-        # Default workdir to the current working directory when the user
-        # invoked `eaccode` without args. Several subsystems (project
-        # context, memory hashing, workspace snapshot) used to crash
-        # when called with workdir=None.
-        run_repl(workdir=Path(workdir) if workdir else Path.cwd(),
-                 initial_messages=initial_messages)
+    bad = False
+    if os.name == "nt":
+        bad = any(cwd_lower.startswith(p.lower())
+                  for p in _UNSAFE_WORKDIR_PREFIXES_WINDOWS)
+    else:
+        if cwd_lower in _UNSAFE_WORKDIR_EXACT_UNIX or any(cwd_lower.startswith(p)
+                 for p in _UNSAFE_WORKDIR_PREFIX_UNIX):
+            bad = True
+
+    if not bad:
+        return None
+    fallback = Path.home()
+    click.echo(
+        f"[ ! ] workdir looks unsafe ({cwd}); falling back to {fallback}.",
+        err=True,
+    )
+    return fallback
+
+
+
 
 
 @main.command()
@@ -83,6 +99,52 @@ def paths() -> None:
     click.echo(f"memory:    {p.memory_dir}")
     click.echo(f"skills:    {p.skills_dir}")
 
+
+
+
+
+# P0.2 (audit): Directories we never want the agent's workdir to land in.
+# PowerShell opens in C:\Windows\System32 by default; bash logins can
+# land in /etc. When we detect one of these, we fall back to the user's
+# home dir and print a one-line warning.
+_UNSAFE_WORKDIR_PREFIXES_WINDOWS: tuple[str, ...] = (
+    r"C:\Windows",
+    r"C:\Program Files",
+    r"C:\Program Files (x86)",
+    r"C:\ProgramData",
+)
+_UNSAFE_WORKDIR_EXACT_UNIX: tuple[str, ...] = (
+    "/", "/etc", "/usr", "/var",
+    "/bin", "/sbin", "/boot", "/lib", "/lib64",
+)
+_UNSAFE_WORKDIR_PREFIX_UNIX: tuple[str, ...] = (
+    "/etc/", "/var/", "/usr/", "/boot/", "/lib/", "/lib64/",
+)
+
+
+def _safe_workdir() -> Path | None:
+
+    cwd = Path.cwd()
+    cwd_str = str(cwd).replace("/", "\\") if os.name == "nt" else str(cwd)
+    cwd_lower = cwd_str.lower()
+
+    bad = False
+    if os.name == "nt":
+        bad = any(cwd_lower.startswith(p.lower())
+                  for p in _UNSAFE_WORKDIR_PREFIXES_WINDOWS)
+    else:
+        if cwd_lower in _UNSAFE_WORKDIR_EXACT_UNIX or any(cwd_lower.startswith(p)
+                 for p in _UNSAFE_WORKDIR_PREFIX_UNIX):
+            bad = True
+
+    if not bad:
+        return None
+    fallback = Path.home()
+    click.echo(
+        f"[ ! ] workdir looks unsafe ({cwd}); falling back to {fallback}.",
+        err=True,
+    )
+    return fallback
 
 
 # Sub-command registration (import side effects register on `main`) —

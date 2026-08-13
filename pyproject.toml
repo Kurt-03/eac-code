@@ -21,6 +21,11 @@ dependencies = [
   # v0.7.2: classic REPL uses prompt_toolkit for cross-platform
   # input editing + history (Windows has no `readline`).
   "prompt_toolkit>=3.0",
+  # v0.7.3 / Plan 271: Rich gives the REPL a single Console with
+  # theme + transient spinner overlay + non-TTY detection (no ANSI
+  # noise when stdout is a file). Required for tool cards and the
+  # version-aware banner.
+  "rich>=15.0",
 ]
 
 [project.optional-dependencies]
@@ -39,7 +44,7 @@ llm = [
 # v0.7.2: TUI group is gone. `ui` is kept as a no-op alias for the
 # CLI install command (`pip install -e ".[all]"`) — removing it would
 # break existing scripts.
-ui = []
+ui = ["rich>=15.0"]
 mcp = [
   "mcp>=2.0",
 ]
